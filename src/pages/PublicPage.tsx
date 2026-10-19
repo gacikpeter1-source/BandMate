@@ -1,0 +1,119 @@
+import { useState } from "react";
+import { Link } from "react-router-dom";
+import { collection, query, where } from "firebase/firestore";
+import { db } from "../firebase";
+import { useLiveQuery } from "../lib/live";
+import { groupItems, itemLabel, money, priceTag } from "../lib/format";
+import { useSettings } from "../state/settings";
+import { useAuth, isStaff } from "../state/auth";
+import { LogoBackdrop, TopBar } from "../components/brand";
+import { Loading, QrFull } from "../components/ui";
+import type { Bundle, Item } from "../types";
+
+/** What fans see: products, prices and payment QR codes. Never stock counts. */
+export default function PublicPage() {
+  const { settings, ready } = useSettings();
+  const { profile } = useAuth();
+  const items = useLiveQuery<Item>(() => query(collection(db, "items"), where("visible", "==", true)), "pub-items");
+  const bundles = useLiveQuery<Bundle>(() => query(collection(db, "bundles"), where("visible", "==", true)), "pub-bundles");
+  const [qr, setQr] = useState<{ src: string | null; title: string; sub: string } | null>(null);
+  const cur = settings.currency;
+  const groups = groupItems(items.data);
+  const bundleList = bundles.data.slice().sort((a, b) => (a.order ?? 0) - (b.order ?? 0));
+
+  const open = (title: string, price: number, src: string | null) => setQr({ src, title, sub: money(price, cur) });
+
+  return (
+    <>
+      <LogoBackdrop settings={settings} />
+      <TopBar settings={settings} />
+      <header className="hero">
+        <div className="hero-in">
+          {settings.logoInHeader && settings.logoUrl && <img className="hero-logo" src={settings.logoUrl} alt="" />}
+          <div className="hero-txt">
+            <h1>{settings.bandName || (ready ? "Merch" : "")}</h1>
+            {settings.tagline && <p>{settings.tagline}</p>}
+          </div>
+        </div>
+      </header>
+      <main className="page">
+        <div className="wrap">
+          {!items.ready ? (
+            <Loading text="Loading the merch…" />
+          ) : !groups.length && !bundleList.length ? (
+            <div className="empty">
+              <h3>Merch is coming soon</h3>
+              <p>Check back at the next show.</p>
+            </div>
+          ) : (
+            <>
+              <p className="lead">Pick an item and scan its QR code to pay. Show the payment confirmation at the merch table to collect it.</p>
+              <div className="grid">
+                {groups.map((g) => {
+                  const single = g.items.length === 1 && !g.items[0].variant;
+                  const allOut = g.items.every((i) => i.soldOut);
+                  return (
+                    <article key={g.key} className={`tile ${allOut ? "dim" : ""}`}>
+                      <div className="tile-top">
+                        <h3>{g.name}</h3>
+                        <span className="tag">{priceTag(g.items, cur)}</span>
+                      </div>
+                      {single ? (
+                        <button className="btn primary block" disabled={g.items[0].soldOut} onClick={() => open(g.name, g.items[0].price, g.items[0].qrUrl)}>
+                          {g.items[0].soldOut ? "Sold out" : g.items[0].qrUrl ? "Show payment QR" : "Buy at the table"}
+                        </button>
+                      ) : (
+                        <>
+                          <div className="sizes">
+                            {g.items.map((it) => (
+                              <button
+                                key={it.id}
+                                className="chip"
+                                disabled={it.soldOut}
+                                onClick={() => open(itemLabel(it), it.price, it.qrUrl)}
+                                aria-label={`${itemLabel(it)}${it.soldOut ? ", sold out" : ""}`}
+                              >
+                                <b>{it.variant || "One size"}</b>
+                                <small>{it.soldOut ? "Sold out" : money(it.price, cur)}</small>
+                              </button>
+                            ))}
+                          </div>
+                          <span className="note">Tap your size to see the payment QR.</span>
+                        </>
+                      )}
+                    </article>
+                  );
+                })}
+              </div>
+              {bundleList.length > 0 && (
+                <>
+                  <h2 className="sec">Bundles</h2>
+                  <div className="grid">
+                    {bundleList.map((b) => (
+                      <article key={b.id} className="tile bundle">
+                        <div className="tile-top">
+                          <div>
+                            <h3>{b.name}</h3>
+                            <div className="sub">{b.parts.map((p) => `${p.qty > 1 ? p.qty + "× " : ""}${p.name}`).join(" + ")}</div>
+                          </div>
+                          <span className="tag">{money(b.price, cur)}</span>
+                        </div>
+                        <button className="btn primary block" onClick={() => open(b.name, b.price, b.qrUrl)}>
+                          {b.qrUrl ? "Show payment QR" : "Buy at the table"}
+                        </button>
+                      </article>
+                    ))}
+                  </div>
+                </>
+              )}
+            </>
+          )}
+          <footer className="foot">
+            {profile && isStaff(profile.role) ? <Link to="/band">Open the band desk</Link> : <Link to="/login">Band login</Link>}
+          </footer>
+        </div>
+      </main>
+      {qr && <QrFull src={qr.src} title={qr.title} sub={qr.sub} onClose={() => setQr(null)} />}
+    </>
+  );
+}

@@ -1,0 +1,23 @@
+rules_version = '2';
+
+// QR pictures and the band logo are public images (fans must see them).
+// Only approved band mates and admins can upload or remove them.
+// Role is read from Firestore users/{uid}.role.
+service firebase.storage {
+  match /b/{bucket}/o {
+    function isStaff() {
+      return request.auth != null
+        && firestore.exists(/databases/(default)/documents/users/$(request.auth.uid))
+        && firestore.get(/databases/(default)/documents/users/$(request.auth.uid)).data.role in ['bandmate', 'admin'];
+    }
+
+    match /public/{folder}/{file} {
+      allow read: if true;
+      allow create, update: if isStaff()
+        && folder in ['qr', 'logo']
+        && request.resource.size < 5 * 1024 * 1024
+        && request.resource.contentType.matches('image/.*');
+      allow delete: if isStaff();
+    }
+  }
+}

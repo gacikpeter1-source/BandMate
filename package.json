@@ -1,0 +1,32 @@
+{
+  "name": "bandmate",
+  "private": true,
+  "version": "0.1.0",
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "tsc --noEmit && vite build",
+    "preview": "vite preview",
+    "emulators": "firebase emulators:start --project demo-bandmate",
+    "test:rules": "firebase emulators:exec --only firestore,storage --project demo-bandmate \"node --test tests/\"",
+    "create-admin": "node scripts/create-admin.mjs"
+  },
+  "dependencies": {
+    "firebase": "^10.14.1",
+    "qrcode": "^1.5.4",
+    "react": "^18.3.1",
+    "react-dom": "^18.3.1",
+    "react-router-dom": "^6.28.0"
+  },
+  "devDependencies": {
+    "@firebase/rules-unit-testing": "^3.0.4",
+    "@types/qrcode": "^1.5.5",
+    "@types/react": "^18.3.12",
+    "@types/react-dom": "^18.3.1",
+    "@vitejs/plugin-react": "^4.3.3",
+    "firebase-admin": "^12.7.0",
+    "firebase-tools": "^13.24.0",
+    "typescript": "^5.6.3",
+    "vite": "^5.4.10"
+  }
+}

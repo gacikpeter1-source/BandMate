@@ -1,0 +1,72 @@
+rules_version = '2';
+
+// Roles live in users/{uid}.role:
+//   pending   – registered, waiting for an admin to approve
+//   bandmate  – approved band member: runs the whole merch desk
+//   admin     – everything a band mate can do, plus approving people and roles
+//   disabled  – blocked
+// Anyone not signed in is a fan: they read the public catalogue only.
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    function signedIn() { return request.auth != null; }
+    function me() { return /databases/$(database)/documents/users/$(request.auth.uid); }
+    function hasProfile() { return signedIn() && exists(me()); }
+    function role() { return get(me()).data.role; }
+    function isAdmin() { return hasProfile() && role() == 'admin'; }
+    function isStaff() { return hasProfile() && role() in ['bandmate', 'admin']; }
+    function onlyChanges(keys) {
+      return request.resource.data.diff(resource.data).affectedKeys().hasOnly(keys);
+    }
+
+    match /users/{uid} {
+      allow read: if signedIn() && (request.auth.uid == uid || isStaff());
+
+      // Self sign-up always starts as "pending". Nobody can make themselves a band mate.
+      allow create: if signedIn()
+        && request.auth.uid == uid
+        && request.resource.data.role == 'pending'
+        && request.resource.data.email == request.auth.token.email
+        && request.resource.data.keys().hasOnly(['email', 'displayName', 'role', 'createdAt']);
+
+      // Admins approve and change roles (but never their own role, to avoid lock-out).
+      // Everyone may change their own display name.
+      allow update: if (isAdmin() && (request.auth.uid != uid || onlyChanges(['displayName'])))
+        || (signedIn() && request.auth.uid == uid && onlyChanges(['displayName']));
+
+      allow delete: if isAdmin() && request.auth.uid != uid;
+    }
+
+    // Public catalogue: fans see visible items and prices, never stock counts.
+    match /items/{id} {
+      allow read: if resource.data.visible == true || isStaff();
+      allow write: if isStaff();
+    }
+    match /bundles/{id} {
+      allow read: if resource.data.visible == true || isStaff();
+      allow write: if isStaff();
+    }
+
+    // Stock counts are band-only.
+    match /stock/{id} {
+      allow read, write: if isStaff();
+    }
+
+    match /sales/{id} {
+      allow read, create: if isStaff();
+      allow update: if isStaff() && onlyChanges(['undone']);
+      allow delete: if isAdmin();
+    }
+
+    // Band name, colours, logo and the fan-screen top bar.
+    match /settings/public {
+      allow read: if true;
+      allow write: if isStaff();
+    }
+    // Current gig and other internal settings.
+    match /settings/band {
+      allow read, write: if isStaff();
+    }
+  }
+}
