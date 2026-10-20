@@ -4,8 +4,9 @@
 // piece at the same moment can push stock to -1; the Stock tab shows that as
 // "oversold" so the band can see it rather than lose it.
 
-import { collection, doc, increment, writeBatch, setDoc, updateDoc } from "firebase/firestore";
+import { doc, increment, writeBatch, setDoc, updateDoc } from "firebase/firestore";
 import { db } from "../firebase";
+import { bandCol, bandDoc, bandPath } from "./scope";
 import type { Item, Method, Photo, Sale, SaleLine } from "../types";
 
 type StockMap = Record<string, number>;
@@ -35,10 +36,10 @@ export function recordSale(opts: {
   stock: StockMap;
 }) {
   const b = writeBatch(db);
-  const ref = doc(collection(db, "sales"));
+  const ref = doc(bandCol("sales"));
   for (const [id, n] of Object.entries(picksTotal(opts.lines))) {
-    b.set(doc(db, "stock", id), { qty: increment(-n) }, { merge: true });
-    b.update(doc(db, "items", id), { soldOut: (opts.stock[id] ?? 0) - n <= 0 });
+    b.set(bandDoc("stock", id), { qty: increment(-n) }, { merge: true });
+    b.update(bandDoc("items", id), { soldOut: (opts.stock[id] ?? 0) - n <= 0 });
   }
   const total = opts.lines.reduce((t, l) => t + l.price * l.qty, 0);
   b.set(ref, {
@@ -61,24 +62,24 @@ export function setSaleUndone(sale: Pick<Sale, "id" | "lines">, undone: boolean,
   const exists = new Set(items.map((i) => i.id));
   for (const [id, n] of Object.entries(picksTotal(sale.lines))) {
     if (!exists.has(id)) continue;
-    b.set(doc(db, "stock", id), { qty: increment(sign * n) }, { merge: true });
-    b.update(doc(db, "items", id), { soldOut: (stock[id] ?? 0) + sign * n <= 0 });
+    b.set(bandDoc("stock", id), { qty: increment(sign * n) }, { merge: true });
+    b.update(bandDoc("items", id), { soldOut: (stock[id] ?? 0) + sign * n <= 0 });
   }
-  b.update(doc(db, "sales", sale.id), { undone });
+  b.update(bandDoc("sales", sale.id), { undone });
   return b.commit();
 }
 
 export function addStock(itemId: string, delta: number, current: number) {
   const b = writeBatch(db);
-  b.set(doc(db, "stock", itemId), { qty: increment(delta) }, { merge: true });
-  b.update(doc(db, "items", itemId), { soldOut: current + delta <= 0 });
+  b.set(bandDoc("stock", itemId), { qty: increment(delta) }, { merge: true });
+  b.update(bandDoc("items", itemId), { soldOut: current + delta <= 0 });
   return b.commit();
 }
 
 export function setStockCount(itemId: string, qty: number) {
   const b = writeBatch(db);
-  b.set(doc(db, "stock", itemId), { qty });
-  b.update(doc(db, "items", itemId), { soldOut: qty <= 0 });
+  b.set(bandDoc("stock", itemId), { qty });
+  b.update(bandDoc("items", itemId), { soldOut: qty <= 0 });
   return b.commit();
 }
 
@@ -90,20 +91,20 @@ export function createItems(
 ) {
   const b = writeBatch(db);
   (variants.length ? variants : [""]).forEach((variant, i) => {
-    const ref = doc(collection(db, "items"));
+    const ref = doc(bandCol("items"));
     b.set(ref, { ...base, variant, soldOut: qty <= 0, order: orderStart + i });
-    b.set(doc(db, "stock", ref.id), { qty });
+    b.set(bandDoc("stock", ref.id), { qty });
   });
   return b.commit();
 }
 
-export const updateItem = (id: string, data: Partial<Omit<Item, "id">>) => updateDoc(doc(db, "items", id), data);
+export const updateItem = (id: string, data: Partial<Omit<Item, "id">>) => updateDoc(bandDoc("items", id), data);
 
 export function deleteItem(id: string) {
   const b = writeBatch(db);
-  b.delete(doc(db, "items", id));
-  b.delete(doc(db, "stock", id));
+  b.delete(bandDoc("items", id));
+  b.delete(bandDoc("stock", id));
   return b.commit();
 }
 
-export const saveDoc = (path: string, data: object, merge = true) => setDoc(doc(db, path), data, { merge });
+export const saveDoc = (path: string, data: object, merge = true) => setDoc(bandPath(path), data, { merge });

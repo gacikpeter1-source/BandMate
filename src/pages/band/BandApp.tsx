@@ -1,5 +1,6 @@
 import { useState, type FormEvent } from "react";
-import { Link, NavLink, Navigate, Route, Routes } from "react-router-dom";
+import { Route, Routes } from "react-router-dom";
+import { Link, NavLink, Navigate } from "../../lib/nav";
 import { signOut } from "firebase/auth";
 import { auth } from "../../firebase";
 import { isStaff, useAuth } from "../../state/auth";

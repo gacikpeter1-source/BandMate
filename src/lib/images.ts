@@ -1,5 +1,6 @@
 import { ref, uploadBytes, getDownloadURL, deleteObject } from "firebase/storage";
 import { storage } from "../firebase";
+import { getBandId } from "./scope";
 
 async function resize(file: File, max: number, type: "image/png" | "image/webp"): Promise<Blob> {
   let bmp: ImageBitmap;
@@ -30,7 +31,7 @@ export async function uploadImage(file: File, folder: "qr" | "logo" | "photos") 
   if (blob.size > 5 * 1024 * 1024) throw new Error("That picture is still over 5 MB after shrinking.");
   const type = blob.type || file.type;
   const ext = type.split("/")[1]?.replace("jpeg", "jpg") || "img";
-  const path = `public/${folder}/${Date.now()}-${Math.random().toString(36).slice(2, 8)}.${ext}`;
+  const path = `bands/${getBandId()}/${folder}/${Date.now()}-${Math.random().toString(36).slice(2, 8)}.${ext}`;
   const r = ref(storage, path);
   await uploadBytes(r, blob, { contentType: type, cacheControl: "public,max-age=31536000,immutable" });
   return { url: await getDownloadURL(r), path };

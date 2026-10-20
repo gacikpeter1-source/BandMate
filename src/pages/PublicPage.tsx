@@ -1,11 +1,12 @@
 import { useState } from "react";
-import { Link } from "react-router-dom";
-import { collection, query, where } from "firebase/firestore";
-import { db } from "../firebase";
+import { Link } from "../lib/nav";
+import { query, where } from "firebase/firestore";
+import { bandCol } from "../lib/scope";
 import { useLiveQuery } from "../lib/live";
 import { groupItems, itemLabel, money, priceTag } from "../lib/format";
 import { useSettings } from "../state/settings";
 import { useAuth, isStaff } from "../state/auth";
+import { useTenant } from "../state/tenant";
 import { LogoBackdrop, TopBar } from "../components/brand";
 import { Loading, PhotoCarousel, PhotoViewer, QrFull } from "../components/ui";
 import type { Bundle, Item, Photo } from "../types";
@@ -14,8 +15,9 @@ import type { Bundle, Item, Photo } from "../types";
 export default function PublicPage() {
   const { settings, ready } = useSettings();
   const { profile } = useAuth();
-  const items = useLiveQuery<Item>(() => query(collection(db, "items"), where("visible", "==", true)), "pub-items");
-  const bundles = useLiveQuery<Bundle>(() => query(collection(db, "bundles"), where("visible", "==", true)), "pub-bundles");
+  const { bandId } = useTenant();
+  const items = useLiveQuery<Item>(() => query(bandCol("items"), where("visible", "==", true)), `pub-items-${bandId}`);
+  const bundles = useLiveQuery<Bundle>(() => query(bandCol("bundles"), where("visible", "==", true)), `pub-bundles-${bandId}`);
   const [qr, setQr] = useState<{ src: string | null; title: string; sub: string } | null>(null);
   const [viewer, setViewer] = useState<{ photos: Photo[]; start: number; title: string } | null>(null);
   const cur = settings.currency;

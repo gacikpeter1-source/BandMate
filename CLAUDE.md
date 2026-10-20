@@ -1,24 +1,51 @@
 # BandMate — notes for Claude Code
 
-Merch inventory + payment-QR app for one band per deployment. React 18 + Vite + TypeScript,
-Firebase (Auth email/password, Firestore, Storage), hosted on Vercel, code on GitHub.
-Setup steps for humans are in README.md.
+Multi-tenant merch inventory + payment-QR app: many bands share one code base, one Firebase project and
+one Vercel project, each band in its own isolated space. React 18 + Vite + TypeScript, Firebase (Auth
+email/password, Firestore, Storage), hosted on Vercel, code on GitHub. Setup steps for humans are in README.md.
 
-## Roles (source of truth: `firestore.rules`, `storage.rules`)
-- Fan (not signed in): reads `items`/`bundles` where `visible == true`, and `settings/public`. Never stock or sales.
-- `pending`: self-registered, waiting. Can only edit own `displayName`.
-- `bandmate`: full band desk (items, stock, bundles, sales, settings, QR/logo uploads).
-- `admin`: bandmate + manage `users` roles + delete sales. Cannot change own role.
+## Tenancy (how a band is found)
+- Every band has an immutable `bandId` (lowercase, digits, dashes; e.g. `saw-dust-and-mold`). Its data lives
+  under `bands/{bandId}/...` and its pictures under `bands/{bandId}/{qr|logo|photos}/...`. Never use the band
+  *name* in a path; the name is display text only and can change.
+- The address decides the band (`src/lib/host.ts`, `src/App.tsx`):
+  - BandMate's own address (`VITE_PLATFORM_HOST`, localhost, `*.vercel.app`) = platform: home page at `/`,
+    operator console at `/platform`, operator login at `/platform/login`, and every band at `/b/<bandId>/...`.
+  - Any other address (`bandname.yourapp.com`, a band's own domain) = the band named in `domains/{host}`
+    (`{ bandId }`), served at the root. Unknown address -> "Address not set up".
+- `TenantProvider` (`src/state/tenant.tsx`) sets the band for the page and `src/lib/scope.ts`
+  (`bandCol`, `bandDoc`, `bandPath`, `getBandId`, `getBase`) so non-React code builds per-band paths.
+  Pages use `src/lib/nav.tsx` (`Link`, `NavLink`, `Navigate`, `useNavigate`), which add the `/b/<bandId>` prefix
+  when needed. Always import those from there, never from `react-router-dom`, inside band pages.
+- One login (Firebase Auth email) works across bands, but each band has its own membership and role;
+  being admin in band A gives nothing in band B. Opening another band's login/desk creates a `pending`
+  membership there that band's admin must approve.
+- Band `status`: `active` | `paused`. Paused = fans see "Temporarily closed", staff cannot read/write (rules),
+  the operator still can.
+- Operator ("BandMate admin") = a doc in `platformAdmins/{uid}`, created only by script. Full access to all bands.
+  The "BandMate admin" link appears only on a band's login screen, never when signed in.
+- Create a band: `node scripts/create-band.mjs <bandId> "<Name>" <adminEmail> [--domain host] [--sample]`.
+  Create the operator: `node scripts/create-platform-admin.mjs <email>`. A new custom domain also has to be added
+  to the Vercel project and to Firebase Auth -> Authorized domains (for the verification-email link) by hand for now.
+
+## Roles (source of truth: `firestore.rules`, `storage.rules`; tests in `tests/rules.test.mjs`)
+Roles live in `bands/{bandId}/members/{uid}.role`:
+- Fan (not signed in): reads one active band's `items`/`bundles` where `visible == true`, and `settings/public`. Never stock or sales.
+- `pending`: self-registered in that band, waiting. Can only edit own `displayName`.
+- `bandmate`: full band desk (items, stock, bundles, sales, settings, QR/logo/photo uploads).
+- `admin`: bandmate + manage `members` roles + delete sales. Cannot change own role.
 - `disabled`: nothing.
-Role lives in `users/{uid}.role`. Self sign-up may only create `role: "pending"`.
-**Email must be verified.** Rules and storage rules require `request.auth.token.email_verified == true` before a profile
-can be created or any role applies. The app sends the Firebase verification email on sign-up, shows
-`src/pages/VerifyEmail.tsx` until confirmed, and only then creates the `pending` profile (`src/state/auth.tsx`).
-Accounts made by `scripts/create-admin.mjs` are marked verified. Unverified Auth accounts stay in Firebase Auth
+Self sign-up may only create `role: "pending"`. The list of all bands and domains is operator-only;
+a single band or domain can be fetched by anyone (needed to show a store).
+**Email must be verified.** Rules and storage rules require `request.auth.token.email_verified == true` before a
+membership can be created or any role applies. The app sends the Firebase verification email on sign-up, shows
+`src/pages/VerifyEmail.tsx` until confirmed, and only then creates the `pending` membership (`src/state/auth.tsx`).
+Accounts made by the scripts are marked verified. Unverified Auth accounts stay in Firebase Auth
 (no cleanup job yet) but have no data or access.
-The admin is created by `scripts/create-admin.mjs` (Admin SDK), never from the client.
 
-## Data model (Firestore)
+## Data model (Firestore, everything under `bands/{bandId}/` unless noted)
+- Top level: `bands/{bandId}` {name, status, createdAt}, `domains/{host}` {bandId}, `platformAdmins/{uid}`.
+- `members/{uid}`: email, displayName, role, createdAt.
 - `items/{id}`: name, variant (size), price, qrUrl, qrPath, images[{url,path}], visible, soldOut, order. Public if visible.
   Sizes of one product share the same `name`; the UI groups by name. Photos belong to the product: the item
   form writes the same `images` to every size of that name (first photo = main). `bundles` also have `images`.
@@ -29,7 +56,7 @@ The admin is created by `scripts/create-admin.mjs` (Admin SDK), never from the c
   Staff may only change `undone` after creation.
 - `settings/public`: bandName, tagline, currency, preset, theme{primary,bg,surface,text}, logoUrl, logoPath, logoOpacity, logoInHeader, topBar{enabled,email,links[{type,url}]}.
 - `settings/band`: { gig } — staff only.
-- Storage: `public/qr/*`, `public/logo/*`, `public/photos/*` — public read, staff write, images < 5 MB.
+- Storage: `bands/{bandId}/qr|logo|photos/*` — public read, that band's staff (or operator) write, images < 5 MB.
   Photos are shrunk to 1400px WebP on the phone before upload (`src/lib/images.ts`); max 6 per product.
   Fan page shows them in a swipeable `PhotoCarousel` with a full-screen `PhotoViewer` (`src/components/ui.tsx`).
 
@@ -37,10 +64,11 @@ The admin is created by `scripts/create-admin.mjs` (Admin SDK), never from the c
 - All stock changes go through `src/lib/ops.ts` (batched `increment()`, works offline). Don't await
   commits in UI handlers; attach `.catch(toast)` so the desk keeps working with no signal.
 - Live data via `useLiveQuery` / `useLiveDoc` in `src/lib/live.ts`; band data in `src/state/band.tsx`.
+  Put the `bandId` in every live-query key.
 - Colours come only from the four theme tokens set by `applyTheme` (`src/lib/theme.ts`); derived
   colours use `color-mix` in `src/styles.css`. No hard-coded colours in components except the
   always-white QR surfaces.
-- If you change a rule, add or update a case in `tests/rules.test.mjs`.
+- If you change a rule, add or update a case in `tests/rules.test.mjs`. Include a cross-band attempt.
 
 ## Layout: mobile first
 Design for a phone in one hand first (320-430px), then scale up. Never assume a wide screen.
@@ -59,14 +87,20 @@ Design for a phone in one hand first (320-430px), then scale up. Never assume a 
 - `npm run build` — typecheck + build (run before every commit)
 - `npm run test:rules` — security-rules tests on the emulators (needs Java 11+)
 - `npx firebase deploy --only firestore:rules,storage` — deploy rules
-- `node scripts/create-admin.mjs <email> <password> [--sample]` with `GOOGLE_APPLICATION_CREDENTIALS` set
+- `node scripts/create-band.mjs`, `create-platform-admin.mjs`, `migrate-to-multitenant.mjs` with `GOOGLE_APPLICATION_CREDENTIALS` set
+  (or the emulator env vars, see `scripts/lib.mjs`)
 
 ## Never commit
 `.env*` (except `.env.example`), `service-account*.json`, any admin password. Don't put passwords
-in code, README, commit messages or Vercel build logs. Vercel needs only the six `VITE_FIREBASE_*` vars.
+in code, README, commit messages or Vercel build logs. Vercel needs the six `VITE_FIREBASE_*` vars and
+`VITE_PLATFORM_HOST` (BandMate's own address).
 
 ## After first deploy
-Add the Vercel domain to Firebase Auth → Settings → Authorized domains, or login will fail there.
+Add the Vercel domain (and every band domain) to Firebase Auth → Settings → Authorized domains, or the
+verification email link will fail there.
 
 ## Ideas not built yet
-Stripe checkout, CSV export of sales, low-stock alerts, per-gig stock counts, multi-band (SaaS) mode.
+Planned in order: operator screen to create/pause bands and map domains; public "request a band space" form
+(verified account, terms checkbox stored with version and time); bandname.yourapp.com subdomains and automatic
+domain setup (needs Vercel token + Cloud Functions); Slovak/English; Stripe (band subscription, then Connect so
+sales payments go to each band; manual QR payments stay). Also: CSV export of sales, low-stock alerts.

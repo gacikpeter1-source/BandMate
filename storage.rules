@@ -1,24 +1,49 @@
 rules_version = '2';
 
-// QR pictures, product photos and the band logo are public images (fans must see them).
-// Only approved band mates and admins can upload or remove them.
-// Role is read from Firestore users/{uid}.role.
+// Pictures are public to read (fans must see them). Only the band's own approved members, or the
+// BandMate operator, can upload or remove them, and only inside their band's folder:
+//   bands/{bandId}/qr|logo|photos/*
+// Role is read from Firestore bands/{bandId}/members/{uid}.role and must have a verified email.
 service firebase.storage {
   match /b/{bucket}/o {
-    function isStaff() {
-      return request.auth != null
-        && request.auth.token.email_verified == true
-        && firestore.exists(/databases/(default)/documents/users/$(request.auth.uid))
-        && firestore.get(/databases/(default)/documents/users/$(request.auth.uid)).data.role in ['bandmate', 'admin'];
+    function verified() {
+      return request.auth != null && request.auth.token.email_verified == true;
+    }
+    function isPlatform() {
+      return verified() && firestore.exists(/databases/(default)/documents/platformAdmins/$(request.auth.uid));
+    }
+    function isStaffOf(bandId) {
+      return verified() && (
+        isPlatform() || (
+          firestore.exists(/databases/(default)/documents/bands/$(bandId)/members/$(request.auth.uid))
+          && firestore.get(/databases/(default)/documents/bands/$(bandId)/members/$(request.auth.uid)).data.role in ['bandmate', 'admin']
+          && firestore.get(/databases/(default)/documents/bands/$(bandId)).data.status == 'active'
+        )
+      );
     }
 
-    match /public/{folder}/{file} {
+    match /bands/{bandId}/{folder}/{file} {
       allow read: if true;
-      allow create, update: if isStaff()
+      allow create, update: if isStaffOf(bandId)
         && folder in ['qr', 'logo', 'photos']
         && request.resource.size < 5 * 1024 * 1024
         && request.resource.contentType.matches('image/.*');
-      allow delete: if isStaff();
+      allow delete: if isStaffOf(bandId);
+    }
+
+    // LEGACY single-band folder (old root layout). REMOVE after the migration is confirmed.
+    match /public/{folder}/{file} {
+      function legacyStaff() {
+        return verified()
+          && firestore.exists(/databases/(default)/documents/users/$(request.auth.uid))
+          && firestore.get(/databases/(default)/documents/users/$(request.auth.uid)).data.role in ['bandmate', 'admin'];
+      }
+      allow read: if true;
+      allow create, update: if legacyStaff()
+        && folder in ['qr', 'logo', 'photos']
+        && request.resource.size < 5 * 1024 * 1024
+        && request.resource.contentType.matches('image/.*');
+      allow delete: if legacyStaff();
     }
   }
 }

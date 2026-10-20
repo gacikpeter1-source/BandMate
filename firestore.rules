@@ -1,75 +1,150 @@
 rules_version = '2';
 
-// Roles live in users/{uid}.role:
-//   pending   – registered, waiting for an admin to approve
-//   bandmate  – approved band member: runs the whole merch desk
+// MULTI-TENANT. Every band's data lives under bands/{bandId}/... and nothing outside that branch
+// is reachable with a role from another band.
+//
+// Roles live in bands/{bandId}/members/{uid}.role:
+//   pending   – registered, waiting for that band's admin to approve
+//   bandmate  – approved member: runs the whole merch desk
 //   admin     – everything a band mate can do, plus approving people and roles
 //   disabled  – blocked
+// platformAdmins/{uid} (created only with the Admin SDK scripts) is the BandMate operator: full access
+// to every band, plus creating bands and domains.
 // Every signed-in account must also have a verified email (token.email_verified) before it can
-// create a profile or use any role; an unverified account is treated like a stranger.
-// Anyone not signed in is a fan: they read the public catalogue only.
+// create a membership or use any role; an unverified account is treated like a stranger.
+// Anyone not signed in is a fan: they read one band's public catalogue only (and only while it is active).
 
 service cloud.firestore {
   match /databases/{database}/documents {
 
     function signedIn() { return request.auth != null; }
-    function me() { return /databases/$(database)/documents/users/$(request.auth.uid); }
     function verified() { return signedIn() && request.auth.token.email_verified == true; }
-    function hasProfile() { return verified() && exists(me()); }
-    function role() { return get(me()).data.role; }
-    function isAdmin() { return hasProfile() && role() == 'admin'; }
-    function isStaff() { return hasProfile() && role() in ['bandmate', 'admin']; }
     function onlyChanges(keys) {
       return request.resource.data.diff(resource.data).affectedKeys().hasOnly(keys);
     }
+    function platformAdmin() {
+      return verified() && exists(/databases/$(database)/documents/platformAdmins/$(request.auth.uid));
+    }
+
+    match /platformAdmins/{uid} {
+      allow read: if verified() && request.auth.uid == uid;
+      allow write: if false;
+    }
+
+    // address (bandname.yourapp.com, a band's own domain) -> { bandId }. Looked up one at a time by
+    // fans' browsers; only the operator can list or change them.
+    match /domains/{host} {
+      allow get: if true;
+      allow list, write: if platformAdmin();
+    }
+
+    match /bands/{bandId} {
+      function bandRef() { return /databases/$(database)/documents/bands/$(bandId); }
+      function memberRef() { return /databases/$(database)/documents/bands/$(bandId)/members/$(request.auth.uid); }
+      function active() { return get(bandRef()).data.status == 'active'; }
+      function memberRole() { return verified() && exists(memberRef()) ? get(memberRef()).data.role : 'none'; }
+      function isAdmin() { return (active() && memberRole() == 'admin') || platformAdmin(); }
+      function isStaff() { return (active() && memberRole() in ['bandmate', 'admin']) || platformAdmin(); }
+
+      // Name/status of one band is public (needed to show its store); the list of all bands is not.
+      allow get: if true;
+      allow list, write: if platformAdmin();
+
+      match /members/{uid} {
+        allow read: if verified() && (request.auth.uid == uid || isStaff());
+
+        // Self sign-up always starts as "pending". Nobody can make themselves a band mate.
+        allow create: if (verified()
+            && request.auth.uid == uid
+            && active()
+            && request.resource.data.role == 'pending'
+            && request.resource.data.email == request.auth.token.email
+            && request.resource.data.keys().hasOnly(['email', 'displayName', 'role', 'createdAt']))
+          || platformAdmin();
+
+        // Admins approve and change roles (but never their own role, to avoid lock-out).
+        // Everyone may change their own display name.
+        allow update: if (isAdmin() && (request.auth.uid != uid || onlyChanges(['displayName'])))
+          || (verified() && request.auth.uid == uid && onlyChanges(['displayName']));
+
+        allow delete: if isAdmin() && request.auth.uid != uid;
+      }
+
+      // Public catalogue: fans see visible items and prices, never stock counts.
+      match /items/{id} {
+        allow read: if (resource.data.visible == true && active()) || isStaff();
+        allow write: if isStaff();
+      }
+      match /bundles/{id} {
+        allow read: if (resource.data.visible == true && active()) || isStaff();
+        allow write: if isStaff();
+      }
+
+      // Stock counts are band-only.
+      match /stock/{id} {
+        allow read, write: if isStaff();
+      }
+
+      match /sales/{id} {
+        allow read, create: if isStaff();
+        allow update: if isStaff() && onlyChanges(['undone']);
+        allow delete: if isAdmin();
+      }
+
+      // Band name, colours, logo and the fan-screen top bar.
+      match /settings/public {
+        allow read: if true;
+        allow write: if isStaff();
+      }
+      // Current gig and other internal settings.
+      match /settings/band {
+        allow read, write: if isStaff();
+      }
+    }
+
+    // ---------------------------------------------------------------------------------------
+    // LEGACY single-band layout (root collections). Only here so the live site keeps working
+    // between deploying these rules and deploying the multi-tenant app. REMOVE after migrating.
+    // ---------------------------------------------------------------------------------------
+    function legacyMe() { return /databases/$(database)/documents/users/$(request.auth.uid); }
+    function legacyHasProfile() { return verified() && exists(legacyMe()); }
+    function legacyRole() { return get(legacyMe()).data.role; }
+    function legacyAdmin() { return legacyHasProfile() && legacyRole() == 'admin'; }
+    function legacyStaff() { return legacyHasProfile() && legacyRole() in ['bandmate', 'admin']; }
 
     match /users/{uid} {
-      allow read: if verified() && (request.auth.uid == uid || isStaff());
-
-      // Self sign-up always starts as "pending". Nobody can make themselves a band mate.
+      allow read: if verified() && (request.auth.uid == uid || legacyStaff());
       allow create: if verified()
         && request.auth.uid == uid
         && request.resource.data.role == 'pending'
         && request.resource.data.email == request.auth.token.email
         && request.resource.data.keys().hasOnly(['email', 'displayName', 'role', 'createdAt']);
-
-      // Admins approve and change roles (but never their own role, to avoid lock-out).
-      // Everyone may change their own display name.
-      allow update: if (isAdmin() && (request.auth.uid != uid || onlyChanges(['displayName'])))
+      allow update: if (legacyAdmin() && (request.auth.uid != uid || onlyChanges(['displayName'])))
         || (verified() && request.auth.uid == uid && onlyChanges(['displayName']));
-
-      allow delete: if isAdmin() && request.auth.uid != uid;
+      allow delete: if legacyAdmin() && request.auth.uid != uid;
     }
-
-    // Public catalogue: fans see visible items and prices, never stock counts.
     match /items/{id} {
-      allow read: if resource.data.visible == true || isStaff();
-      allow write: if isStaff();
+      allow read: if resource.data.visible == true || legacyStaff();
+      allow write: if legacyStaff();
     }
     match /bundles/{id} {
-      allow read: if resource.data.visible == true || isStaff();
-      allow write: if isStaff();
+      allow read: if resource.data.visible == true || legacyStaff();
+      allow write: if legacyStaff();
     }
-
-    // Stock counts are band-only.
     match /stock/{id} {
-      allow read, write: if isStaff();
+      allow read, write: if legacyStaff();
     }
-
     match /sales/{id} {
-      allow read, create: if isStaff();
-      allow update: if isStaff() && onlyChanges(['undone']);
-      allow delete: if isAdmin();
+      allow read, create: if legacyStaff();
+      allow update: if legacyStaff() && onlyChanges(['undone']);
+      allow delete: if legacyAdmin();
     }
-
-    // Band name, colours, logo and the fan-screen top bar.
     match /settings/public {
       allow read: if true;
-      allow write: if isStaff();
+      allow write: if legacyStaff();
     }
-    // Current gig and other internal settings.
     match /settings/band {
-      allow read, write: if isStaff();
+      allow read, write: if legacyStaff();
     }
   }
 }

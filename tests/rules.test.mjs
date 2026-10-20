@@ -1,16 +1,19 @@
 // Security rules tests. Run with: npm run test:rules
+// Two active bands (a, b), one paused band (c), and people with different roles in each.
 import { test, before, after, beforeEach } from "node:test";
 import { readFileSync } from "node:fs";
-import {
-  initializeTestEnvironment,
-  assertFails,
-  assertSucceeds,
-} from "@firebase/rules-unit-testing";
+import { initializeTestEnvironment, assertFails, assertSucceeds } from "@firebase/rules-unit-testing";
 import { doc, getDoc, setDoc, updateDoc, getDocs, collection, query, where, deleteDoc } from "firebase/firestore";
 import { ref, uploadBytes } from "firebase/storage";
 
 let env;
-const ids = { admin: "u-admin", mate: "u-mate", pending: "u-pend", off: "u-off" };
+const ids = {
+  platform: "u-platform",
+  adminA: "u-admin-a", mateA: "u-mate-a", pendA: "u-pend-a", offA: "u-off-a",
+  adminB: "u-admin-b", mateB: "u-mate-b",
+  both: "u-both", // band mate in A, only pending in B
+  stranger: "u-stranger", // verified account with no membership anywhere
+};
 
 before(async () => {
   env = await initializeTestEnvironment({
@@ -25,105 +28,182 @@ beforeEach(async () => {
   await env.clearFirestore();
   await env.withSecurityRulesDisabled(async (ctx) => {
     const db = ctx.firestore();
-    await setDoc(doc(db, "users", ids.admin), { email: "admin@admin.com", displayName: "Admin", role: "admin" });
-    await setDoc(doc(db, "users", ids.mate), { email: "mate@band.com", displayName: "Mate", role: "bandmate" });
-    await setDoc(doc(db, "users", ids.pending), { email: "new@band.com", displayName: "New", role: "pending" });
-    await setDoc(doc(db, "users", ids.off), { email: "off@band.com", displayName: "Off", role: "disabled" });
-    await setDoc(doc(db, "items", "hat"), { name: "Hat", variant: "", price: 20, visible: true, soldOut: false });
-    await setDoc(doc(db, "items", "secret"), { name: "Prototype", variant: "", price: 99, visible: false, soldOut: false });
-    await setDoc(doc(db, "stock", "hat"), { qty: 50 });
-    await setDoc(doc(db, "settings", "public"), { bandName: "Band" });
-    await setDoc(doc(db, "settings", "band"), { gig: "Košice" });
-    await setDoc(doc(db, "sales", "s1"), { total: 20, undone: false, lines: [] });
+    await setDoc(doc(db, "platformAdmins", ids.platform), { email: "ops@bandmate.app" });
+    await setDoc(doc(db, "domains", "merch.band-a.com"), { bandId: "a" });
+    for (const [b, status] of [["a", "active"], ["b", "active"], ["c", "paused"]]) {
+      await setDoc(doc(db, "bands", b), { name: `Band ${b}`, status });
+      await setDoc(doc(db, "bands", b, "items", "hat"), { name: "Hat", variant: "", price: 20, visible: true, soldOut: false });
+      await setDoc(doc(db, "bands", b, "items", "secret"), { name: "Prototype", variant: "", price: 99, visible: false, soldOut: false });
+      await setDoc(doc(db, "bands", b, "stock", "hat"), { qty: 50 });
+      await setDoc(doc(db, "bands", b, "settings", "public"), { bandName: `Band ${b}` });
+      await setDoc(doc(db, "bands", b, "settings", "band"), { gig: "Košice" });
+      await setDoc(doc(db, "bands", b, "sales", "s1"), { total: 20, undone: false, lines: [] });
+    }
+    const member = (b, uid, role) => setDoc(doc(db, "bands", b, "members", uid), { email: `${uid}@x.com`, displayName: uid, role });
+    await member("a", ids.adminA, "admin");
+    await member("a", ids.mateA, "bandmate");
+    await member("a", ids.pendA, "pending");
+    await member("a", ids.offA, "disabled");
+    await member("a", ids.both, "bandmate");
+    await member("b", ids.adminB, "admin");
+    await member("b", ids.mateB, "bandmate");
+    await member("b", ids.both, "pending");
   });
 });
 
-// Signed-in test users have a verified email unless a test says otherwise.
 const claims = (email, verified = true) => ({ ...(email ? { email } : {}), email_verified: verified });
 const as = (who, email, verified = true) => env.authenticatedContext(who, claims(email, verified)).firestore();
 const authed = (who, verified = true) => env.authenticatedContext(who, claims(undefined, verified));
 const fan = () => env.unauthenticatedContext().firestore();
+const item = (b, id = "x") => doc(as(ids.mateA), "bands", b, "items", id);
 
-test("fan reads visible items, settings; never stock, sales, hidden items", async () => {
+test("fan reads one active band's visible items and settings; never stock, sales, hidden items", async () => {
   const db = fan();
-  await assertSucceeds(getDoc(doc(db, "items", "hat")));
-  await assertSucceeds(getDocs(query(collection(db, "items"), where("visible", "==", true))));
-  await assertSucceeds(getDoc(doc(db, "settings", "public")));
-  await assertFails(getDoc(doc(db, "items", "secret")));
-  await assertFails(getDocs(collection(db, "items")));
-  await assertFails(getDoc(doc(db, "stock", "hat")));
-  await assertFails(getDocs(collection(db, "sales")));
-  await assertFails(getDoc(doc(db, "settings", "band")));
-  await assertFails(setDoc(doc(db, "items", "x"), { name: "X", visible: true }));
+  await assertSucceeds(getDoc(doc(db, "bands", "a", "items", "hat")));
+  await assertSucceeds(getDocs(query(collection(db, "bands", "a", "items"), where("visible", "==", true))));
+  await assertSucceeds(getDoc(doc(db, "bands", "a", "settings", "public")));
+  await assertSucceeds(getDoc(doc(db, "bands", "a")));
+  await assertFails(getDoc(doc(db, "bands", "a", "items", "secret")));
+  await assertFails(getDocs(collection(db, "bands", "a", "items")));
+  await assertFails(getDoc(doc(db, "bands", "a", "stock", "hat")));
+  await assertFails(getDocs(collection(db, "bands", "a", "sales")));
+  await assertFails(getDoc(doc(db, "bands", "a", "settings", "band")));
+  await assertFails(setDoc(doc(db, "bands", "a", "items", "x"), { name: "X", visible: true }));
+  await assertFails(getDocs(collection(db, "bands"))); // the list of bands is not public
+  await assertFails(getDocs(collection(db, "domains")));
 });
 
-test("sign-up creates only a pending profile", async () => {
-  const db = as("u-new2", "fresh@band.com");
-  await assertFails(setDoc(doc(db, "users", "u-new2"), { email: "fresh@band.com", displayName: "F", role: "bandmate", createdAt: 1 }));
-  await assertFails(setDoc(doc(db, "users", "u-new2"), { email: "other@band.com", displayName: "F", role: "pending", createdAt: 1 }));
-  await assertFails(setDoc(doc(db, "users", "someone-else"), { email: "fresh@band.com", displayName: "F", role: "pending", createdAt: 1 }));
-  await assertSucceeds(setDoc(doc(db, "users", "u-new2"), { email: "fresh@band.com", displayName: "F", role: "pending", createdAt: 1 }));
+test("a paused band shows nothing to fans and lets its own staff do nothing", async () => {
+  await assertFails(getDoc(doc(fan(), "bands", "c", "items", "hat")));
+  await env.withSecurityRulesDisabled(async (ctx) => {
+    await setDoc(doc(ctx.firestore(), "bands", "c", "members", ids.mateA), { email: "m@x.com", displayName: "M", role: "bandmate" });
+  });
+  await assertFails(getDoc(doc(as(ids.mateA), "bands", "c", "stock", "hat")));
+  await assertFails(setDoc(doc(as(ids.mateA), "bands", "c", "items", "x"), { name: "X", visible: true }));
+  await assertSucceeds(getDoc(doc(as(ids.platform), "bands", "c", "stock", "hat"))); // operator still can
 });
 
-test("an unverified email gets no profile and no access, whatever the role", async () => {
+test("sign-up creates only a pending membership in that one band", async () => {
+  const db = as("u-new", "fresh@band.com");
+  const m = (b) => doc(db, "bands", b, "members", "u-new");
+  await assertFails(setDoc(m("a"), { email: "fresh@band.com", displayName: "F", role: "bandmate", createdAt: 1 }));
+  await assertFails(setDoc(m("a"), { email: "other@band.com", displayName: "F", role: "pending", createdAt: 1 }));
+  await assertFails(setDoc(doc(db, "bands", "a", "members", "someone-else"), { email: "fresh@band.com", displayName: "F", role: "pending", createdAt: 1 }));
+  await assertFails(setDoc(m("c"), { email: "fresh@band.com", displayName: "F", role: "pending", createdAt: 1 })); // paused band
+  await assertSucceeds(setDoc(m("a"), { email: "fresh@band.com", displayName: "F", role: "pending", createdAt: 1 }));
+  await assertSucceeds(setDoc(m("b"), { email: "fresh@band.com", displayName: "F", role: "pending", createdAt: 1 })); // same person, other band: separate membership
+});
+
+test("an unverified email gets no membership and no access, whatever the role", async () => {
   const fresh = as("u-new3", "fresh3@band.com", false);
-  await assertFails(setDoc(doc(fresh, "users", "u-new3"), { email: "fresh3@band.com", displayName: "F", role: "pending", createdAt: 1 }));
-  for (const who of [ids.admin, ids.mate, ids.pending]) {
+  await assertFails(setDoc(doc(fresh, "bands", "a", "members", "u-new3"), { email: "fresh3@band.com", displayName: "F", role: "pending", createdAt: 1 }));
+  for (const who of [ids.adminA, ids.mateA, ids.pendA, ids.platform]) {
     const db = as(who, undefined, false);
-    await assertFails(getDoc(doc(db, "users", who)));
-    await assertFails(getDoc(doc(db, "stock", "hat")));
-    await assertFails(getDocs(collection(db, "sales")));
-    await assertFails(setDoc(doc(db, "items", "x"), { name: "X", visible: true }));
-    await assertFails(updateDoc(doc(db, "users", who), { displayName: "Renamed" }));
+    await assertFails(getDoc(doc(db, "bands", "a", "members", who)));
+    await assertFails(getDoc(doc(db, "bands", "a", "stock", "hat")));
+    await assertFails(getDocs(collection(db, "bands", "a", "sales")));
+    await assertFails(setDoc(doc(db, "bands", "a", "items", "x"), { name: "X", visible: true }));
+    await assertFails(updateDoc(doc(db, "bands", "a", "members", who), { displayName: "Renamed" }));
   }
-  await assertSucceeds(getDoc(doc(as(ids.mate, undefined, false), "items", "hat"))); // public catalogue stays public
+  await assertSucceeds(getDoc(doc(as(ids.mateA, undefined, false), "bands", "a", "items", "hat"))); // public catalogue stays public
 });
 
-test("pending and disabled users cannot touch band data", async () => {
-  for (const who of [ids.pending, ids.off]) {
+test("pending and disabled members cannot touch band data", async () => {
+  for (const who of [ids.pendA, ids.offA]) {
     const db = as(who);
-    await assertFails(getDoc(doc(db, "stock", "hat")));
-    await assertFails(getDocs(collection(db, "sales")));
-    await assertFails(setDoc(doc(db, "items", "x"), { name: "X", visible: true }));
-    await assertFails(updateDoc(doc(db, "users", who), { role: "bandmate" }));
-    await assertSucceeds(updateDoc(doc(db, "users", who), { displayName: "Renamed" }));
+    await assertFails(getDoc(doc(db, "bands", "a", "stock", "hat")));
+    await assertFails(getDocs(collection(db, "bands", "a", "sales")));
+    await assertFails(setDoc(doc(db, "bands", "a", "items", "x"), { name: "X", visible: true }));
+    await assertFails(updateDoc(doc(db, "bands", "a", "members", who), { role: "bandmate" }));
+    await assertSucceeds(updateDoc(doc(db, "bands", "a", "members", who), { displayName: "Renamed" }));
   }
 });
 
-test("band mate runs the desk but cannot manage people", async () => {
-  const db = as(ids.mate);
-  await assertSucceeds(getDoc(doc(db, "stock", "hat")));
-  await assertSucceeds(setDoc(doc(db, "stock", "hat"), { qty: 60 }));
-  await assertSucceeds(setDoc(doc(db, "items", "cup"), { name: "Cup", variant: "", price: 12, visible: true, soldOut: false }));
-  await assertSucceeds(getDocs(collection(db, "items")));
-  await assertSucceeds(setDoc(doc(db, "settings", "public"), { bandName: "New name" }));
-  await assertSucceeds(setDoc(doc(db, "sales", "s2"), { total: 25, undone: false, lines: [] }));
-  await assertSucceeds(updateDoc(doc(db, "sales", "s1"), { undone: true }));
-  await assertFails(updateDoc(doc(db, "sales", "s1"), { total: 0 }));
-  await assertFails(deleteDoc(doc(db, "sales", "s1")));
-  await assertFails(updateDoc(doc(db, "users", ids.pending), { role: "bandmate" }));
-  await assertFails(updateDoc(doc(db, "users", ids.mate), { role: "admin" }));
+test("band mate runs their own desk but cannot manage people", async () => {
+  const db = as(ids.mateA);
+  const p = (...x) => doc(db, "bands", "a", ...x);
+  await assertSucceeds(getDoc(p("stock", "hat")));
+  await assertSucceeds(setDoc(p("stock", "hat"), { qty: 60 }));
+  await assertSucceeds(setDoc(p("items", "cup"), { name: "Cup", variant: "", price: 12, visible: true, soldOut: false }));
+  await assertSucceeds(getDocs(collection(db, "bands", "a", "items")));
+  await assertSucceeds(setDoc(p("settings", "public"), { bandName: "New name" }));
+  await assertSucceeds(setDoc(p("sales", "s2"), { total: 25, undone: false, lines: [] }));
+  await assertSucceeds(updateDoc(p("sales", "s1"), { undone: true }));
+  await assertFails(updateDoc(p("sales", "s1"), { total: 0 }));
+  await assertFails(deleteDoc(p("sales", "s1")));
+  await assertFails(updateDoc(p("members", ids.pendA), { role: "bandmate" }));
+  await assertFails(updateDoc(p("members", ids.mateA), { role: "admin" }));
+  await assertFails(setDoc(doc(db, "bands", "a"), { name: "Hijacked", status: "active" })); // cannot edit the band record
 });
 
-test("admin approves people but cannot change own role", async () => {
-  const db = as(ids.admin);
-  await assertSucceeds(updateDoc(doc(db, "users", ids.pending), { role: "bandmate" }));
-  await assertSucceeds(updateDoc(doc(db, "users", ids.mate), { role: "disabled" }));
-  await assertFails(updateDoc(doc(db, "users", ids.admin), { role: "bandmate" }));
-  await assertSucceeds(deleteDoc(doc(db, "sales", "s1")));
+test("band admin approves people in their band but cannot change own role", async () => {
+  const db = as(ids.adminA);
+  const m = (u) => doc(db, "bands", "a", "members", u);
+  await assertSucceeds(updateDoc(m(ids.pendA), { role: "bandmate" }));
+  await assertSucceeds(updateDoc(m(ids.mateA), { role: "disabled" }));
+  await assertFails(updateDoc(m(ids.adminA), { role: "bandmate" }));
+  await assertSucceeds(deleteDoc(doc(db, "bands", "a", "sales", "s1")));
 });
 
-test("storage: only band staff upload images; everyone reads", async () => {
+test("a band can never reach another band, even with a role there", async () => {
+  for (const who of [ids.adminA, ids.mateA]) {
+    const db = as(who);
+    await assertFails(getDoc(doc(db, "bands", "b", "stock", "hat")));
+    await assertFails(getDocs(collection(db, "bands", "b", "sales")));
+    await assertFails(getDoc(doc(db, "bands", "b", "settings", "band")));
+    await assertFails(getDocs(collection(db, "bands", "b", "members")));
+    await assertFails(setDoc(doc(db, "bands", "b", "items", "x"), { name: "X", visible: true }));
+    await assertFails(setDoc(doc(db, "bands", "b", "stock", "hat"), { qty: 0 }));
+    await assertFails(setDoc(doc(db, "bands", "b", "settings", "public"), { bandName: "Hijacked" }));
+    await assertFails(updateDoc(doc(db, "bands", "b", "members", ids.mateB), { role: "disabled" }));
+    await assertFails(updateDoc(doc(db, "bands", "b", "members", ids.both), { role: "admin" }));
+    await assertFails(deleteDoc(doc(db, "bands", "b", "sales", "s1")));
+  }
+});
+
+test("one login in two bands has the role of each band, not the stronger one", async () => {
+  const db = as(ids.both);
+  await assertSucceeds(getDoc(doc(db, "bands", "a", "stock", "hat"))); // band mate in A
+  await assertFails(getDoc(doc(db, "bands", "b", "stock", "hat"))); // only pending in B
+  await assertFails(setDoc(doc(db, "bands", "b", "items", "x"), { name: "X", visible: true }));
+  const stranger = as(ids.stranger);
+  await assertFails(getDoc(doc(stranger, "bands", "a", "stock", "hat")));
+  await assertFails(getDoc(doc(stranger, "bands", "a", "members", ids.mateA)));
+});
+
+test("only the BandMate operator creates bands and domains, and sees every band", async () => {
+  const op = as(ids.platform);
+  await assertSucceeds(setDoc(doc(op, "bands", "new-band"), { name: "New", status: "active", createdAt: 1 }));
+  await assertSucceeds(setDoc(doc(op, "domains", "new.bandmate.app"), { bandId: "new-band" }));
+  await assertSucceeds(getDocs(collection(op, "bands")));
+  await assertSucceeds(getDocs(collection(op, "domains")));
+  await assertSucceeds(getDoc(doc(op, "bands", "b", "stock", "hat")));
+  await assertSucceeds(updateDoc(doc(op, "bands", "b", "members", ids.mateB), { role: "disabled" }));
+  await assertSucceeds(setDoc(doc(op, "bands", "new-band", "members", "u-first-admin"), { email: "o@x.com", displayName: "O", role: "admin" }));
+  for (const db of [as(ids.adminA), as(ids.mateA), as(ids.stranger), fan()]) {
+    await assertFails(setDoc(doc(db, "bands", "new-band"), { name: "New", status: "active" }));
+    await assertFails(setDoc(doc(db, "domains", "evil.com"), { bandId: "a" }));
+    await assertFails(setDoc(doc(db, "domains", "merch.band-a.com"), { bandId: "b" })); // cannot repoint a domain
+    await assertFails(setDoc(doc(db, "platformAdmins", "u-evil"), { email: "e@x.com" }));
+  }
+  await assertSucceeds(getDoc(doc(fan(), "domains", "merch.band-a.com"))); // looked up by fans' browsers
+});
+
+test("storage: only a band's own staff upload into that band's folder; everyone reads", async () => {
   const png = new Uint8Array([137, 80, 78, 71, 13, 10, 26, 10]);
   const up = (ctx, path, type = "image/png") => uploadBytes(ref(ctx.storage(), path), png, { contentType: type });
-  await assertFails(up(env.unauthenticatedContext(), "public/qr/a.png"));
-  await assertFails(up(authed(ids.pending), "public/qr/a.png"));
-  await assertFails(up(authed(ids.mate, false), "public/qr/a.png"));
-  await assertSucceeds(up(authed(ids.mate), "public/qr/a.png"));
-  await assertSucceeds(up(authed(ids.admin), "public/logo/l.png"));
-  await assertFails(up(authed(ids.mate), "public/qr/a.html", "text/html"));
-  await assertSucceeds(up(authed(ids.mate), "public/photos/p.png"));
-  await assertFails(up(authed(ids.pending), "public/photos/p.png"));
-  await assertFails(up(env.unauthenticatedContext(), "public/photos/p.png"));
-  await assertFails(up(authed(ids.mate), "private/x.png"));
+  await assertFails(up(env.unauthenticatedContext(), "bands/a/photos/p.png"));
+  await assertFails(up(authed(ids.pendA), "bands/a/photos/p.png"));
+  await assertFails(up(authed(ids.mateA, false), "bands/a/photos/p.png"));
+  await assertSucceeds(up(authed(ids.mateA), "bands/a/photos/p.png"));
+  await assertSucceeds(up(authed(ids.mateA), "bands/a/qr/q.png"));
+  await assertSucceeds(up(authed(ids.adminA), "bands/a/logo/l.png"));
+  await assertFails(up(authed(ids.mateA), "bands/b/photos/p.png")); // other band's folder
+  await assertFails(up(authed(ids.mateB), "bands/a/photos/p.png"));
+  await assertFails(up(authed(ids.both), "bands/b/photos/p.png")); // pending in B
+  await assertFails(up(authed(ids.mateA), "bands/c/photos/p.png")); // paused band
+  await assertFails(up(authed(ids.mateA), "bands/a/photos/p.html", "text/html"));
+  await assertFails(up(authed(ids.mateA), "bands/a/secret/x.png"));
+  await assertFails(up(authed(ids.mateA), "private/x.png"));
+  await assertSucceeds(up(authed(ids.platform), "bands/b/photos/p.png")); // operator
 });

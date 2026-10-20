@@ -1,5 +1,5 @@
 import { useMemo, useState } from "react";
-import { Link } from "react-router-dom";
+import { Link } from "../../lib/nav";
 import { useBand } from "../../state/band";
 import { useSettings } from "../../state/settings";
 import { useAuth } from "../../state/auth";

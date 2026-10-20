@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { Link } from "react-router-dom";
+import { Link } from "../lib/nav";
 import { sendEmailVerification, signOut } from "firebase/auth";
 import { auth } from "../firebase";
 import { errorText } from "../lib/format";

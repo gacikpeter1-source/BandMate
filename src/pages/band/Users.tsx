@@ -1,5 +1,5 @@
-import { doc, updateDoc } from "firebase/firestore";
-import { db } from "../../firebase";
+import { updateDoc } from "firebase/firestore";
+import { bandDoc } from "../../lib/scope";
 import { useBand } from "../../state/band";
 import { ROLE_LABEL, useAuth } from "../../state/auth";
 import { useToast } from "../../state/toast";
@@ -16,7 +16,7 @@ export default function Users() {
 
   const setRole = (u: UserProfile, role: Role) => {
     const extra = role === "bandmate" && u.role === "pending" ? { approvedBy: profile!.id, approvedAt: Date.now() } : {};
-    updateDoc(doc(db, "users", u.id), { role, ...extra }).catch((e) => toast(errorText(e)));
+    updateDoc(bandDoc("members", u.id), { role, ...extra }).catch((e) => toast(errorText(e)));
     toast(role === "bandmate" && u.role === "pending" ? `${u.displayName || u.email} is now a BandMate` : `${u.displayName || u.email}: ${ROLE_LABEL[role]}`);
   };
 

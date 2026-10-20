@@ -1,6 +1,6 @@
 # BandMate
 
-Merch inventory and payment-QR app for bands. One copy of the app = one band.
+Merch inventory and payment-QR app for bands. One app serves many bands: each band has its own isolated store, team and settings, reached at its own address.
 
 - **Fan page** (`/`): no login. Products, prices and payment QR codes. Stock counts are never shown, only "Sold out". Optional top bar with social-media QR codes and an email address.
 - **Band desk** (`/band`): for approved BandMates. Sell with a basket and bundles, see stock, add pieces, upload QR pictures, track sales per gig, and set the band's colours, logo and top bar.
@@ -8,14 +8,21 @@ Merch inventory and payment-QR app for bands. One copy of the app = one band.
 
 Built with React + Vite, Firebase Auth / Firestore / Storage, and hosted on Vercel.
 
-## Roles
+## How bands are separated
+
+Every band has its own space under its own short ID (for example `saw-dust-and-mold`). Its products, stock, sales, team, colours and pictures can only be reached by that band's own team, and the security rules enforce this on Google's servers. The same person can sign in with one email and password and be part of several bands, with a separate role in each.
+
+- **BandMate's own address** (for example `band-mate-zeta.vercel.app`) shows the BandMate home page. Each band is reachable there at `/b/<bandId>`. BandMate admin signs in at `/platform/login`.
+- **A band's own address** (`bandname.yourapp.com` or the band's own domain) opens only that band's store at the root.
+
+## Roles (inside one band)
 
 | Role | Who | Can do |
 |---|---|---|
 | Fan | Anyone, not signed in | See visible products, prices, QR codes, top bar |
 | Pending | Signed up, not approved yet | Sees a "waiting for approval" screen only |
 | BandMate | Approved by the admin | Everything on the band desk: stock, adding pieces, QR uploads, bundles, sales, undo, colours, logo, top bar |
-| Admin | Created with the script below | Everything a BandMate can do, plus approving people, changing roles and deleting sales |
+| Admin | The band's first admin is created with `create-band` (below) | Everything a BandMate can do, plus approving people, changing roles and deleting sales |
 | Disabled | Blocked by the admin | Nothing |
 
 These rules are enforced on Google's servers by `firestore.rules` and `storage.rules`, not only by hiding buttons. A fan who opens the browser console still can't read stock or sales.
@@ -36,6 +43,7 @@ These rules are enforced on Google's servers by `firestore.rules` and `storage.r
 ```bash
 cp .env.example .env.local
 # fill in VITE_FIREBASE_API_KEY, AUTH_DOMAIN, PROJECT_ID, STORAGE_BUCKET, MESSAGING_SENDER_ID, APP_ID
+# and VITE_PLATFORM_HOST (the address BandMate itself runs on)
 ```
 
 ### 3. Install and deploy the security rules
@@ -49,24 +57,30 @@ npx firebase deploy --only firestore:rules,storage
 
 The Storage rules read each person's role from Firestore. The first deploy asks you to allow that, so answer **Yes**.
 
-### 4. Create the admin account
+### 4. Create the BandMate admin and the first band
 
-The admin password is set from your computer, never written into the app, so nobody can read it from the website's code.
+Passwords are never typed into the app or the scripts' output, so nobody can read them from the website's code.
 
 1. **Project settings → Service accounts → Generate new private key.** Save it in this folder as `service-account.json`. It's already in `.gitignore`, so it never goes to GitHub.
-2. Run:
+2. Create yourself as BandMate admin (can open every band):
 
 ```bash
 GOOGLE_APPLICATION_CREDENTIALS=./service-account.json \
-  node scripts/create-admin.mjs admin@admin.com 'YOUR-PASSWORD' --sample
+  node scripts/create-platform-admin.mjs you@example.com
 ```
 
-`--sample` adds the starter stock (White hat 50, T-shirt S 12 / L 48 / XXL 0, Cup 3) and a "Shirt + Hat" bundle. Leave it out to start empty.
+3. Create a band with its first admin. `--sample` adds example stock; `--domain` (repeatable) is an address that should open this band:
 
-3. Delete `service-account.json` afterwards, or keep it somewhere safe outside the project.
-4. Sign in at `/login`. Then go to **Settings → Your account** and change the password.
+```bash
+GOOGLE_APPLICATION_CREDENTIALS=./service-account.json \
+  node scripts/create-band.mjs my-band "My Band" admin@myband.com --sample --domain merch.myband.com
+```
 
-`admin@admin.com` isn't a real mailbox, so "Forgot password" can't reach it. If you lose the password, run the script again with a new one.
+A new login gets a random password. Open the band's login page (`/b/my-band/login`) and use **Forgot password?** to set your own.
+
+4. Delete `service-account.json` afterwards, or keep it somewhere safe outside the project.
+
+Each extra address must also be added to the Vercel project (Settings → Domains) and to Firebase **Authentication → Settings → Authorized domains**.
 
 ### 5. Run locally
 
@@ -83,14 +97,14 @@ git push -u origin main
 ```
 
 1. In Vercel, **Add New → Project →** import the GitHub repo. Vercel detects Vite by itself.
-2. **Settings → Environment Variables**: add the same six `VITE_FIREBASE_*` values from `.env.local`.
+2. **Settings → Environment Variables**: add the same `VITE_FIREBASE_*` values from `.env.local`, plus `VITE_PLATFORM_HOST` (the address BandMate itself runs on, for example `band-mate-zeta.vercel.app`).
 3. Deploy. Then in Firebase, go to **Authentication → Settings → Authorized domains** and add your Vercel domain, for example `bandmate.vercel.app`, or the band's own domain.
 
 From then on, every push to `main` redeploys automatically.
 
 ## How band members join
 
-1. They open `/register`, enter a name, email and password, and land on a "Waiting for approval" screen.
+1. They open the band's `/register` page (`/b/<bandId>/register` on BandMate's address), enter a name, email and password, and land on a "Waiting for approval" screen.
 2. The admin opens **People**, which shows a red badge when someone is waiting, and taps **Approve as BandMate**.
 3. Their screen switches to the band desk by itself.
 
@@ -108,4 +122,4 @@ The tests check that fans can't see stock, sales or hidden items, that sign-ups 
 
 - **Offline:** sales are saved on the phone straight away and sync when the signal comes back, so the desk works in basement clubs. Because of this, two phones selling the very last piece at the same moment can push stock below zero. The Stock tab then shows "−1 over" in red, so you can see it happened.
 - **Payments** are confirmed by hand ("Payment received · mark sold"). Stripe can be added later as another payment method in the checkout.
-- **Selling to other bands:** each band gets its own Firebase project and Vercel deployment from this same repo. That keeps every band's data fully separate.
+- **Selling to other bands:** one deployment serves every band. Create each with `scripts/create-band.mjs`; the data of different bands is separated by the security rules (and tested in `tests/rules.test.mjs`).

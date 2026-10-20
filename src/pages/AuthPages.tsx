@@ -1,5 +1,5 @@
 import { useState, type FormEvent, type ReactNode } from "react";
-import { Link, Navigate, useNavigate } from "react-router-dom";
+import { Link, Navigate, useNavigate } from "../lib/nav";
 import { createUserWithEmailAndPassword, sendEmailVerification, sendPasswordResetEmail, signInWithEmailAndPassword, updateProfile } from "firebase/auth";
 import { auth } from "../firebase";
 import { errorText } from "../lib/format";
@@ -7,16 +7,19 @@ import { verifyLinkSettings } from "../lib/verify";
 import { setPendingName, useAuth } from "../state/auth";
 import { useSettings } from "../state/settings";
 import { LogoBackdrop } from "../components/brand";
+import { platformAdminUrl } from "../lib/host";
+import { useTenant } from "../state/tenant";
 
 function Shell({ title, children }: { title: string; children: ReactNode }) {
   const { settings } = useSettings();
+  const { bandId } = useTenant();
   return (
     <>
       <LogoBackdrop settings={settings} />
       <main className="page auth">
         <div className="authcard">
           <Link to="/" className="back">
-            ← {settings.bandName || "Merch"} shop
+            ← {bandId ? `${settings.bandName || "Merch"} shop` : "BandMate"}
           </Link>
           <h1>{title}</h1>
           {children}
@@ -26,15 +29,17 @@ function Shell({ title, children }: { title: string; children: ReactNode }) {
   );
 }
 
-export function Login() {
+/** `platform` = the BandMate operator's own login (/platform/login), not a band's. */
+export function Login({ platform = false }: { platform?: boolean }) {
   const nav = useNavigate();
+  const after = platform ? "/platform" : "/band";
   const { user, ready } = useAuth();
   const [email, setEmail] = useState("");
   const [pw, setPw] = useState("");
   const [err, setErr] = useState("");
   const [info, setInfo] = useState("");
   const [busy, setBusy] = useState(false);
-  if (ready && user) return <Navigate to="/band" replace />;
+  if (ready && user) return <Navigate to={after} replace />;
 
   const submit = async (e: FormEvent) => {
     e.preventDefault();
@@ -42,7 +47,7 @@ export function Login() {
     setErr("");
     try {
       await signInWithEmailAndPassword(auth, email.trim(), pw);
-      nav("/band");
+      nav(after);
     } catch (x) {
       setErr(errorText(x));
     } finally {
@@ -51,7 +56,7 @@ export function Login() {
   };
 
   return (
-    <Shell title="Band login">
+    <Shell title={platform ? "BandMate admin" : "Band login"}>
       <form onSubmit={submit} className="stack">
         <div className="field">
           <label htmlFor="lEmail">Email</label>
@@ -83,9 +88,17 @@ export function Login() {
           Forgot password?
         </button>
       </form>
-      <p className="note center">
-        New band member? <Link to="/register">Create an account</Link>
-      </p>
+      {!platform && (
+        <>
+          <p className="note center">
+            New band member? <Link to="/register">Create an account</Link>
+          </p>
+          {/* Only here, on the login screen: never shown once someone is signed in. */}
+          <p className="note center">
+            <a href={platformAdminUrl()}>BandMate admin</a>
+          </p>
+        </>
+      )}
     </Shell>
   );
 }

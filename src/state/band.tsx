@@ -1,9 +1,10 @@
 import { createContext, useContext, useMemo, useState, type ReactNode } from "react";
-import { collection, doc, limit, orderBy, query } from "firebase/firestore";
-import { db } from "../firebase";
+import { limit, orderBy, query } from "firebase/firestore";
 import { useLiveDoc, useLiveQuery } from "../lib/live";
 import type { BandSettings, BasketLine, Bundle, Item, Sale, UserProfile } from "../types";
+import { bandCol, bandPath } from "../lib/scope";
 import { useAuth } from "./auth";
+import { useTenant } from "./tenant";
 
 interface BandData {
   items: Item[];
@@ -21,13 +22,14 @@ const Ctx = createContext<BandData | null>(null);
 
 export function BandDataProvider({ children }: { children: ReactNode }) {
   const { profile } = useAuth();
+  const { bandId } = useTenant();
   const admin = profile?.role === "admin";
-  const items = useLiveQuery<Item>(() => collection(db, "items"), "items");
-  const stockQ = useLiveQuery<{ id: string; qty: number }>(() => collection(db, "stock"), "stock");
-  const bundles = useLiveQuery<Bundle>(() => collection(db, "bundles"), "bundles");
-  const sales = useLiveQuery<Sale>(() => query(collection(db, "sales"), orderBy("at", "desc"), limit(1000)), "sales");
-  const band = useLiveDoc<BandSettings>(() => doc(db, "settings", "band"), "settings-band");
-  const users = useLiveQuery<UserProfile>(() => (admin ? collection(db, "users") : null), `users-${admin}`);
+  const items = useLiveQuery<Item>(() => bandCol("items"), `items-${bandId}`);
+  const stockQ = useLiveQuery<{ id: string; qty: number }>(() => bandCol("stock"), `stock-${bandId}`);
+  const bundles = useLiveQuery<Bundle>(() => bandCol("bundles"), `bundles-${bandId}`);
+  const sales = useLiveQuery<Sale>(() => query(bandCol("sales"), orderBy("at", "desc"), limit(1000)), `sales-${bandId}`);
+  const band = useLiveDoc<BandSettings>(() => bandPath("settings/band"), `settings-band-${bandId}`);
+  const users = useLiveQuery<UserProfile>(() => (admin ? bandCol("members") : null), `members-${bandId}-${admin}`);
   const [basket, setBasketState] = useState<BasketLine[]>([]);
 
   const stock = useMemo(() => {

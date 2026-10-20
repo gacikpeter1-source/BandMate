@@ -1,6 +1,6 @@
 import { useState, type FormEvent } from "react";
-import { collection, deleteDoc, doc, setDoc } from "firebase/firestore";
-import { db } from "../../firebase";
+import { deleteDoc, doc, setDoc } from "firebase/firestore";
+import { bandCol, bandDoc } from "../../lib/scope";
 import { useBand } from "../../state/band";
 import { useSettings } from "../../state/settings";
 import { useToast } from "../../state/toast";
@@ -67,7 +67,7 @@ function BundleSheet({ bundle, onClose }: { bundle: Bundle | null; onClose: () =
     e.preventDefault();
     const clean = parts.filter((p) => p.name).map((p) => ({ name: p.name, qty: Math.max(1, p.qty || 1) }));
     if (!clean.length) return toast("Add at least one item to the bundle.");
-    const ref = bundle ? doc(db, "bundles", bundle.id) : doc(collection(db, "bundles"));
+    const ref = bundle ? bandDoc("bundles", bundle.id) : doc(bandCol("bundles"));
     setDoc(ref, {
       name: name.trim(),
       price: Number(price) || 0,
@@ -117,7 +117,7 @@ function BundleSheet({ bundle, onClose }: { bundle: Bundle | null; onClose: () =
           <ConfirmButton
             confirmText="Tap again to delete"
             onConfirm={() => {
-              deleteDoc(doc(db, "bundles", bundle.id)).catch((x) => toast(errorText(x)));
+              deleteDoc(bandDoc("bundles", bundle.id)).catch((x) => toast(errorText(x)));
               toast("Bundle deleted");
               onClose();
             }}

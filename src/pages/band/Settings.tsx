@@ -1,8 +1,9 @@
 import { useEffect, useState, type FormEvent } from "react";
-import { Link } from "react-router-dom";
+import { Link } from "../../lib/nav";
 import { EmailAuthProvider, reauthenticateWithCredential, signOut, updatePassword } from "firebase/auth";
-import { doc, updateDoc } from "firebase/firestore";
-import { auth, db } from "../../firebase";
+import { setDoc } from "firebase/firestore";
+import { auth } from "../../firebase";
+import { bandDoc } from "../../lib/scope";
 import { useSettings } from "../../state/settings";
 import { ROLE_LABEL, useAuth } from "../../state/auth";
 import { useToast } from "../../state/toast";
@@ -254,7 +255,7 @@ function AccountSection() {
         onSubmit={(e) => {
           e.preventDefault();
           if (!profile) return;
-          updateDoc(doc(db, "users", profile.id), { displayName: name.trim() }).catch((x) => toast(errorText(x)));
+          setDoc(bandDoc("members", profile.id), { displayName: name.trim() }, { merge: true }).catch((x) => toast(errorText(x)));
           toast("Name saved");
         }}
       >

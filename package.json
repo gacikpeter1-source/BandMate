@@ -9,7 +9,9 @@
     "preview": "vite preview",
     "emulators": "firebase emulators:start --project demo-bandmate",
     "test:rules": "firebase emulators:exec --only firestore,storage --project demo-bandmate \"node --test tests/rules.test.mjs\"",
-    "create-admin": "node scripts/create-admin.mjs"
+    "create-band": "node scripts/create-band.mjs",
+    "create-platform-admin": "node scripts/create-platform-admin.mjs",
+    "migrate": "node scripts/migrate-to-multitenant.mjs"
   },
   "dependencies": {
     "firebase": "^10.14.1",

@@ -1,9 +1,9 @@
 import { createContext, useContext, useEffect, useState, type ReactNode } from "react";
-import { doc } from "firebase/firestore";
-import { db } from "../firebase";
 import { useLiveDoc } from "../lib/live";
 import { PRESETS, applyTheme } from "../lib/theme";
+import { bandPath } from "../lib/scope";
 import type { PublicSettings, Theme } from "../types";
+import { useTenant } from "./tenant";
 
 export const DEFAULT_SETTINGS: PublicSettings = {
   bandName: "",
@@ -28,7 +28,8 @@ interface SettingsState {
 const Ctx = createContext<SettingsState>({ settings: DEFAULT_SETTINGS, ready: false, previewTheme: () => {} });
 
 export function SettingsProvider({ children }: { children: ReactNode }) {
-  const live = useLiveDoc<Partial<PublicSettings>>(() => doc(db, "settings", "public"), "settings-public");
+  const { bandId } = useTenant();
+  const live = useLiveDoc<Partial<PublicSettings>>(() => (bandId ? bandPath("settings/public") : null), `settings-public-${bandId}`);
   const [preview, setPreview] = useState<Theme | null>(null);
   const d = live.data || {};
   const settings: PublicSettings = {
@@ -42,8 +43,8 @@ export function SettingsProvider({ children }: { children: ReactNode }) {
 
   useEffect(() => applyTheme(t), [themeKey]); // eslint-disable-line react-hooks/exhaustive-deps
   useEffect(() => {
-    document.title = settings.bandName ? `${settings.bandName} · Merch` : "BandMate";
-  }, [settings.bandName]);
+    document.title = bandId && settings.bandName ? `${settings.bandName} · Merch` : "BandMate";
+  }, [settings.bandName, bandId]);
 
   return <Ctx.Provider value={{ settings, ready: live.ready, previewTheme: setPreview }}>{children}</Ctx.Provider>;
 }
