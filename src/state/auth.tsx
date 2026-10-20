@@ -9,8 +9,12 @@ interface AuthState {
   profile: UserProfile | null;
   ready: boolean;
 }
+interface AuthCtx extends AuthState {
+  /** Re-reads the account from Firebase after the person clicked the email link. */
+  recheck: () => Promise<void>;
+}
 
-const Ctx = createContext<AuthState>({ user: null, profile: null, ready: false });
+const Ctx = createContext<AuthCtx>({ user: null, profile: null, ready: false, recheck: async () => {} });
 
 // The register page sets the chosen name here before the account exists, so the
 // profile document is created once, by the listener below, with the right name.
@@ -21,6 +25,15 @@ export const setPendingName = (n: string) => {
 
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [s, set] = useState<AuthState>({ user: null, profile: null, ready: false });
+  const [tick, setTick] = useState(0);
+
+  const recheck = async () => {
+    const u = auth.currentUser;
+    if (!u) return;
+    await u.reload();
+    await u.getIdToken(true); // the rules read email_verified from the token, so refresh it
+    setTick((t) => t + 1);
+  };
 
   useEffect(() => {
     let stopDoc: (() => void) | null = null;
@@ -29,6 +42,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       stopDoc = null;
       if (!u) {
         set({ user: null, profile: null, ready: true });
+        return;
+      }
+      // Nobody gets a profile (or any access) until the email address is confirmed;
+      // firestore.rules and storage.rules enforce the same thing on the server.
+      if (!u.emailVerified) {
+        set({ user: u, profile: null, ready: true });
         return;
       }
       set({ user: u, profile: null, ready: false });
@@ -56,9 +75,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       stop();
       stopDoc?.();
     };
-  }, []);
+  }, [tick]);
 
-  return <Ctx.Provider value={s}>{children}</Ctx.Provider>;
+  return <Ctx.Provider value={{ ...s, recheck }}>{children}</Ctx.Provider>;
 }
 
 export const useAuth = () => useContext(Ctx);

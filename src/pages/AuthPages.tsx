@@ -1,8 +1,9 @@
 import { useState, type FormEvent, type ReactNode } from "react";
 import { Link, Navigate, useNavigate } from "react-router-dom";
-import { createUserWithEmailAndPassword, sendPasswordResetEmail, signInWithEmailAndPassword, updateProfile } from "firebase/auth";
+import { createUserWithEmailAndPassword, sendEmailVerification, sendPasswordResetEmail, signInWithEmailAndPassword, updateProfile } from "firebase/auth";
 import { auth } from "../firebase";
 import { errorText } from "../lib/format";
+import { verifyLinkSettings } from "../lib/verify";
 import { setPendingName, useAuth } from "../state/auth";
 import { useSettings } from "../state/settings";
 import { LogoBackdrop } from "../components/brand";
@@ -108,6 +109,8 @@ export function Register() {
       setPendingName(name.trim());
       const cred = await createUserWithEmailAndPassword(auth, email.trim(), pw);
       await updateProfile(cred.user, { displayName: name.trim() }).catch(() => {});
+      // If this fails the next screen has a "Send again" button, so it is not fatal.
+      await sendEmailVerification(cred.user, verifyLinkSettings()).catch(() => {});
       nav("/band");
     } catch (x) {
       setErr(errorText(x));
@@ -117,7 +120,7 @@ export function Register() {
 
   return (
     <Shell title="Join the band desk">
-      <p className="note">After you sign up, the admin approves your account and makes you a BandMate.</p>
+      <p className="note">We email you a link to confirm your address. After that, the admin approves your account and makes you a BandMate.</p>
       <form onSubmit={submit} className="stack">
         <div className="field">
           <label htmlFor="rName">Your name</label>

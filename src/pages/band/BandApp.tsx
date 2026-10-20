@@ -16,11 +16,13 @@ import Bundles from "./Bundles";
 import Sales from "./Sales";
 import SettingsPage from "./Settings";
 import Users from "./Users";
+import VerifyEmail from "../VerifyEmail";
 
 export default function BandApp() {
   const { user, profile, ready } = useAuth();
   if (!ready) return <main className="page"><div className="wrap"><Loading text="Signing in…" /></div></main>;
   if (!user) return <Navigate to="/login" replace />;
+  if (!user.emailVerified) return <VerifyEmail />;
   if (!profile || !isStaff(profile.role)) return <Waiting />;
   return (
     <BandDataProvider>

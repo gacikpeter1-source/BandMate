@@ -11,6 +11,11 @@ Setup steps for humans are in README.md.
 - `admin`: bandmate + manage `users` roles + delete sales. Cannot change own role.
 - `disabled`: nothing.
 Role lives in `users/{uid}.role`. Self sign-up may only create `role: "pending"`.
+**Email must be verified.** Rules and storage rules require `request.auth.token.email_verified == true` before a profile
+can be created or any role applies. The app sends the Firebase verification email on sign-up, shows
+`src/pages/VerifyEmail.tsx` until confirmed, and only then creates the `pending` profile (`src/state/auth.tsx`).
+Accounts made by `scripts/create-admin.mjs` are marked verified. Unverified Auth accounts stay in Firebase Auth
+(no cleanup job yet) but have no data or access.
 The admin is created by `scripts/create-admin.mjs` (Admin SDK), never from the client.
 
 ## Data model (Firestore)

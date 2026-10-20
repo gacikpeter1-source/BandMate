@@ -38,7 +38,10 @@ beforeEach(async () => {
   });
 });
 
-const as = (who, email) => env.authenticatedContext(who, email ? { email } : {}).firestore();
+// Signed-in test users have a verified email unless a test says otherwise.
+const claims = (email, verified = true) => ({ ...(email ? { email } : {}), email_verified: verified });
+const as = (who, email, verified = true) => env.authenticatedContext(who, claims(email, verified)).firestore();
+const authed = (who, verified = true) => env.authenticatedContext(who, claims(undefined, verified));
 const fan = () => env.unauthenticatedContext().firestore();
 
 test("fan reads visible items, settings; never stock, sales, hidden items", async () => {
@@ -60,6 +63,20 @@ test("sign-up creates only a pending profile", async () => {
   await assertFails(setDoc(doc(db, "users", "u-new2"), { email: "other@band.com", displayName: "F", role: "pending", createdAt: 1 }));
   await assertFails(setDoc(doc(db, "users", "someone-else"), { email: "fresh@band.com", displayName: "F", role: "pending", createdAt: 1 }));
   await assertSucceeds(setDoc(doc(db, "users", "u-new2"), { email: "fresh@band.com", displayName: "F", role: "pending", createdAt: 1 }));
+});
+
+test("an unverified email gets no profile and no access, whatever the role", async () => {
+  const fresh = as("u-new3", "fresh3@band.com", false);
+  await assertFails(setDoc(doc(fresh, "users", "u-new3"), { email: "fresh3@band.com", displayName: "F", role: "pending", createdAt: 1 }));
+  for (const who of [ids.admin, ids.mate, ids.pending]) {
+    const db = as(who, undefined, false);
+    await assertFails(getDoc(doc(db, "users", who)));
+    await assertFails(getDoc(doc(db, "stock", "hat")));
+    await assertFails(getDocs(collection(db, "sales")));
+    await assertFails(setDoc(doc(db, "items", "x"), { name: "X", visible: true }));
+    await assertFails(updateDoc(doc(db, "users", who), { displayName: "Renamed" }));
+  }
+  await assertSucceeds(getDoc(doc(as(ids.mate, undefined, false), "items", "hat"))); // public catalogue stays public
 });
 
 test("pending and disabled users cannot touch band data", async () => {
@@ -100,9 +117,10 @@ test("storage: only band staff upload images; everyone reads", async () => {
   const png = new Uint8Array([137, 80, 78, 71, 13, 10, 26, 10]);
   const up = (ctx, path, type = "image/png") => uploadBytes(ref(ctx.storage(), path), png, { contentType: type });
   await assertFails(up(env.unauthenticatedContext(), "public/qr/a.png"));
-  await assertFails(up(env.authenticatedContext(ids.pending), "public/qr/a.png"));
-  await assertSucceeds(up(env.authenticatedContext(ids.mate), "public/qr/a.png"));
-  await assertSucceeds(up(env.authenticatedContext(ids.admin), "public/logo/l.png"));
-  await assertFails(up(env.authenticatedContext(ids.mate), "public/qr/a.html", "text/html"));
-  await assertFails(up(env.authenticatedContext(ids.mate), "private/x.png"));
+  await assertFails(up(authed(ids.pending), "public/qr/a.png"));
+  await assertFails(up(authed(ids.mate, false), "public/qr/a.png"));
+  await assertSucceeds(up(authed(ids.mate), "public/qr/a.png"));
+  await assertSucceeds(up(authed(ids.admin), "public/logo/l.png"));
+  await assertFails(up(authed(ids.mate), "public/qr/a.html", "text/html"));
+  await assertFails(up(authed(ids.mate), "private/x.png"));
 });

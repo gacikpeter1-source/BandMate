@@ -8,7 +8,7 @@
     "build": "tsc --noEmit && vite build",
     "preview": "vite preview",
     "emulators": "firebase emulators:start --project demo-bandmate",
-    "test:rules": "firebase emulators:exec --only firestore,storage --project demo-bandmate \"node --test tests/\"",
+    "test:rules": "firebase emulators:exec --only firestore,storage --project demo-bandmate \"node --test tests/rules.test.mjs\"",
     "create-admin": "node scripts/create-admin.mjs"
   },
   "dependencies": {

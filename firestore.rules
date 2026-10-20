@@ -5,6 +5,8 @@ rules_version = '2';
 //   bandmate  – approved band member: runs the whole merch desk
 //   admin     – everything a band mate can do, plus approving people and roles
 //   disabled  – blocked
+// Every signed-in account must also have a verified email (token.email_verified) before it can
+// create a profile or use any role; an unverified account is treated like a stranger.
 // Anyone not signed in is a fan: they read the public catalogue only.
 
 service cloud.firestore {
@@ -12,7 +14,8 @@ service cloud.firestore {
 
     function signedIn() { return request.auth != null; }
     function me() { return /databases/$(database)/documents/users/$(request.auth.uid); }
-    function hasProfile() { return signedIn() && exists(me()); }
+    function verified() { return signedIn() && request.auth.token.email_verified == true; }
+    function hasProfile() { return verified() && exists(me()); }
     function role() { return get(me()).data.role; }
     function isAdmin() { return hasProfile() && role() == 'admin'; }
     function isStaff() { return hasProfile() && role() in ['bandmate', 'admin']; }
@@ -21,10 +24,10 @@ service cloud.firestore {
     }
 
     match /users/{uid} {
-      allow read: if signedIn() && (request.auth.uid == uid || isStaff());
+      allow read: if verified() && (request.auth.uid == uid || isStaff());
 
       // Self sign-up always starts as "pending". Nobody can make themselves a band mate.
-      allow create: if signedIn()
+      allow create: if verified()
         && request.auth.uid == uid
         && request.resource.data.role == 'pending'
         && request.resource.data.email == request.auth.token.email
@@ -33,7 +36,7 @@ service cloud.firestore {
       // Admins approve and change roles (but never their own role, to avoid lock-out).
       // Everyone may change their own display name.
       allow update: if (isAdmin() && (request.auth.uid != uid || onlyChanges(['displayName'])))
-        || (signedIn() && request.auth.uid == uid && onlyChanges(['displayName']));
+        || (verified() && request.auth.uid == uid && onlyChanges(['displayName']));
 
       allow delete: if isAdmin() && request.auth.uid != uid;
     }
