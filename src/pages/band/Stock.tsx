@@ -5,8 +5,9 @@ import { useAuth } from "../../state/auth";
 import { useToast } from "../../state/toast";
 import { errorText, groupItems, itemLabel, money } from "../../lib/format";
 import { addStock, createItems, deleteItem, recordSale, setStockCount, updateItem } from "../../lib/ops";
-import { ConfirmButton, Icon, ImageField, QrFull, Sheet, Toggle } from "../../components/ui";
-import type { Item } from "../../types";
+import { removeImage } from "../../lib/images";
+import { ConfirmButton, Icon, ImageField, PhotosField, QrFull, Sheet, Toggle } from "../../components/ui";
+import type { Item, Photo } from "../../types";
 
 const pill = (n: number) => (n < 0 ? "out" : n === 0 ? "out" : n <= 3 ? "low" : "ok");
 
@@ -161,6 +162,12 @@ function ItemSheet({ item, onClose }: { item: Item | null; onClose: () => void }
   const [visible, setVisible] = useState(item?.visible ?? true);
   const [qr, setQr] = useState<{ url: string; path: string } | null>(item?.qrUrl ? { url: item.qrUrl, path: item.qrPath || "" } : null);
   const [applyQrToGroup, setApplyQrToGroup] = useState(false);
+  // Photos belong to the product, so every size of it shares one set (kept in sync on save).
+  const sameName = (a: string, b: string) => a.trim().toLowerCase() === b.trim().toLowerCase();
+  const groupPhotos = (n: string): Photo[] => items.find((i) => i.images?.length && sameName(i.name, n))?.images ?? [];
+  const startPhotos = item ? (item.images?.length ? item.images : groupPhotos(item.name)) : null;
+  const [photos, setPhotos] = useState<Photo[] | null>(startPhotos);
+  const shownPhotos = photos ?? groupPhotos(name); // a new size of an existing product starts with its photos
   const names = [...new Set(items.map((i) => i.name.trim()))];
   const siblings = item ? items.filter((i) => i.id !== item.id && i.name.trim().toLowerCase() === item.name.trim().toLowerCase()) : [];
 
@@ -170,14 +177,20 @@ function ItemSheet({ item, onClose }: { item: Item | null; onClose: () => void }
     const q = Math.max(0, parseInt(count) || 0);
     const done = (x: Promise<unknown>) => x.catch((err) => toast(errorText(err)));
     if (item) {
-      done(updateItem(item.id, { name: name.trim(), variant: variant.trim(), price: p, visible, qrUrl: qr?.url ?? null, qrPath: qr?.path ?? null }));
+      done(updateItem(item.id, { name: name.trim(), variant: variant.trim(), price: p, visible, qrUrl: qr?.url ?? null, qrPath: qr?.path ?? null, images: shownPhotos }));
+      const before = (startPhotos ?? []).map((x) => x.url).join("|");
+      if (shownPhotos.map((x) => x.url).join("|") !== before) {
+        siblings.forEach((s) => done(updateItem(s.id, { images: shownPhotos })));
+        const keep = new Set(shownPhotos.map((x) => x.path));
+        (startPhotos ?? []).filter((x) => !keep.has(x.path)).forEach((x) => removeImage(x.path));
+      }
       if (q !== (stock[item.id] ?? 0)) done(setStockCount(item.id, q));
       if (applyQrToGroup) siblings.forEach((s) => done(updateItem(s.id, { qrUrl: qr?.url ?? null, qrPath: qr?.path ?? null })));
       toast(`${itemLabel({ name, variant })} saved`);
     } else {
       const variants = variant.split(",").map((v) => v.trim()).filter(Boolean);
       const order = Math.max(0, ...items.map((i) => i.order ?? 0)) + 1;
-      done(createItems({ name: name.trim(), price: p, qrUrl: qr?.url ?? null, qrPath: qr?.path ?? null, visible }, variants, q, order));
+      done(createItems({ name: name.trim(), price: p, qrUrl: qr?.url ?? null, qrPath: qr?.path ?? null, visible, images: shownPhotos }, variants, q, order));
       toast(variants.length > 1 ? `Added ${variants.length} sizes of ${name.trim()}` : `${name.trim()} added`);
     }
     onClose();
@@ -207,6 +220,7 @@ function ItemSheet({ item, onClose }: { item: Item | null; onClose: () => void }
             <input id="fCount" type="number" inputMode="numeric" min="0" step="1" required value={count} onChange={(e) => setCount(e.target.value)} />
           </div>
         </div>
+        <PhotosField label="Photos" photos={shownPhotos} onChange={setPhotos} hint="Fans scroll through these on the shop page. The first photo is the main one. All sizes of this item share the same photos." />
         <ImageField label="Payment QR picture" folder="qr" url={qr?.url ?? null} onChange={setQr} hint="A screenshot of the QR from your payment app (SumUp, Revolut, bank app…). Fans scan it to pay this item." />
         {item && siblings.length > 0 && (
           <Toggle id="fGroupQr" checked={applyQrToGroup} onChange={setApplyQrToGroup} label={`Use this QR for all ${item.name} sizes`} hint={`Also sets it on ${siblings.map((s) => s.variant || "one size").join(", ")}.`} />

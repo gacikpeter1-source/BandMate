@@ -122,5 +122,8 @@ test("storage: only band staff upload images; everyone reads", async () => {
   await assertSucceeds(up(authed(ids.mate), "public/qr/a.png"));
   await assertSucceeds(up(authed(ids.admin), "public/logo/l.png"));
   await assertFails(up(authed(ids.mate), "public/qr/a.html", "text/html"));
+  await assertSucceeds(up(authed(ids.mate), "public/photos/p.png"));
+  await assertFails(up(authed(ids.pending), "public/photos/p.png"));
+  await assertFails(up(env.unauthenticatedContext(), "public/photos/p.png"));
   await assertFails(up(authed(ids.mate), "private/x.png"));
 });

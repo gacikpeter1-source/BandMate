@@ -6,7 +6,7 @@
 
 import { collection, doc, increment, writeBatch, setDoc, updateDoc } from "firebase/firestore";
 import { db } from "../firebase";
-import type { Item, Method, Sale, SaleLine } from "../types";
+import type { Item, Method, Photo, Sale, SaleLine } from "../types";
 
 type StockMap = Record<string, number>;
 
@@ -83,7 +83,7 @@ export function setStockCount(itemId: string, qty: number) {
 }
 
 export function createItems(
-  base: { name: string; price: number; qrUrl: string | null; qrPath: string | null; visible: boolean },
+  base: { name: string; price: number; qrUrl: string | null; qrPath: string | null; visible: boolean; images: Photo[] },
   variants: string[],
   qty: number,
   orderStart: number

@@ -7,8 +7,8 @@ import { groupItems, itemLabel, money, priceTag } from "../lib/format";
 import { useSettings } from "../state/settings";
 import { useAuth, isStaff } from "../state/auth";
 import { LogoBackdrop, TopBar } from "../components/brand";
-import { Loading, QrFull } from "../components/ui";
-import type { Bundle, Item } from "../types";
+import { Loading, PhotoCarousel, PhotoViewer, QrFull } from "../components/ui";
+import type { Bundle, Item, Photo } from "../types";
 
 /** What fans see: products, prices and payment QR codes. Never stock counts. */
 export default function PublicPage() {
@@ -17,6 +17,7 @@ export default function PublicPage() {
   const items = useLiveQuery<Item>(() => query(collection(db, "items"), where("visible", "==", true)), "pub-items");
   const bundles = useLiveQuery<Bundle>(() => query(collection(db, "bundles"), where("visible", "==", true)), "pub-bundles");
   const [qr, setQr] = useState<{ src: string | null; title: string; sub: string } | null>(null);
+  const [viewer, setViewer] = useState<{ photos: Photo[]; start: number; title: string } | null>(null);
   const cur = settings.currency;
   const groups = groupItems(items.data);
   const bundleList = bundles.data.slice().sort((a, b) => (a.order ?? 0) - (b.order ?? 0));
@@ -52,8 +53,10 @@ export default function PublicPage() {
                 {groups.map((g) => {
                   const single = g.items.length === 1 && !g.items[0].variant;
                   const allOut = g.items.every((i) => i.soldOut);
+                  const photos = g.items.find((i) => i.images?.length)?.images ?? [];
                   return (
-                    <article key={g.key} className={`tile ${allOut ? "dim" : ""}`}>
+                    <article key={g.key} className={`tile ${photos.length ? "photo" : ""} ${allOut ? "dim" : ""}`}>
+                      {photos.length > 0 && <PhotoCarousel photos={photos} alt={g.name} onOpen={(start) => setViewer({ photos, start, title: g.name })} />}
                       <div className="tile-top">
                         <h3>{g.name}</h3>
                         <span className="tag">{priceTag(g.items, cur)}</span>
@@ -90,7 +93,8 @@ export default function PublicPage() {
                   <h2 className="sec">Bundles</h2>
                   <div className="grid">
                     {bundleList.map((b) => (
-                      <article key={b.id} className="tile bundle">
+                      <article key={b.id} className={`tile bundle ${b.images?.length ? "photo" : ""}`}>
+                        {!!b.images?.length && <PhotoCarousel photos={b.images} alt={b.name} onOpen={(start) => setViewer({ photos: b.images!, start, title: b.name })} />}
                         <div className="tile-top">
                           <div>
                             <h3>{b.name}</h3>
@@ -113,6 +117,7 @@ export default function PublicPage() {
           </footer>
         </div>
       </main>
+      {viewer && <PhotoViewer photos={viewer.photos} start={viewer.start} title={viewer.title} onClose={() => setViewer(null)} />}
       {qr && <QrFull src={qr.src} title={qr.title} sub={qr.sub} onClose={() => setQr(null)} />}
     </>
   );

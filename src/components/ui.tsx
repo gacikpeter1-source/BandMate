@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState, type ReactNode } from "react";
 import { uploadImage } from "../lib/images";
 import { errorText } from "../lib/format";
+import type { Photo } from "../types";
 
 export const Icon = {
   x: (
@@ -167,6 +168,145 @@ export function Loading({ text = "Opening the merch box…" }: { text?: string }
   return (
     <div className="empty">
       <h3>{text}</h3>
+    </div>
+  );
+}
+
+
+/** Several product photos: add, remove, and pick which one is shown first. */
+export function PhotosField({
+  label,
+  hint,
+  photos,
+  onChange,
+  max = 6,
+}: {
+  label: string;
+  hint?: string;
+  photos: Photo[];
+  onChange: (v: Photo[]) => void;
+  max?: number;
+}) {
+  const [busy, setBusy] = useState(false);
+  const [err, setErr] = useState("");
+  const input = useRef<HTMLInputElement>(null);
+  const room = max - photos.length;
+
+  const add = async (files: File[]) => {
+    setBusy(true);
+    setErr("");
+    const added: Photo[] = [];
+    try {
+      for (const f of files.slice(0, Math.max(0, room))) added.push(await uploadImage(f, "photos"));
+      if (files.length > room) setErr(`Only ${max} photos fit. The first ${Math.max(0, room)} were added.`);
+    } catch (x) {
+      setErr(errorText(x));
+    } finally {
+      if (added.length) onChange([...photos, ...added]);
+      setBusy(false);
+      if (input.current) input.current.value = "";
+    }
+  };
+
+  return (
+    <div className="field">
+      <span className="label">{label}</span>
+      <div className="photos">
+        {photos.map((p, i) => (
+          <div className="ph" key={p.url}>
+            <img src={p.url} alt="" />
+            <button type="button" className="ph-x" onClick={() => onChange(photos.filter((_, j) => j !== i))} aria-label={`Remove photo ${i + 1}`}>
+              {Icon.x}
+            </button>
+            {i === 0 ? (
+              <span className="ph-main">Main</span>
+            ) : (
+              <button type="button" className="ph-make" onClick={() => onChange([p, ...photos.filter((_, j) => j !== i)])}>
+                Make main
+              </button>
+            )}
+          </div>
+        ))}
+        {room > 0 && (
+          <label className={`ph add filebtn ${busy ? "busy" : ""}`}>
+            <span>{busy ? "Uploading…" : "+ Add photos"}</span>
+            <input
+              ref={input}
+              type="file"
+              multiple
+              accept="image/png,image/jpeg,image/webp,image/gif"
+              disabled={busy}
+              onChange={(e) => {
+                const f = Array.from(e.target.files || []);
+                if (f.length) add(f);
+              }}
+            />
+          </label>
+        )}
+      </div>
+      {err ? <span className="hint err">{err}</span> : hint && <span className="hint">{hint}</span>}
+    </div>
+  );
+}
+
+/** Swipeable photo strip (CSS scroll-snap) with dots, like a shop page. */
+export function PhotoCarousel({ photos, alt, onOpen }: { photos: Photo[]; alt: string; onOpen?: (index: number) => void }) {
+  const [i, setI] = useState(0);
+  const track = useRef<HTMLDivElement>(null);
+  const go = (d: number) => {
+    const t = track.current;
+    if (t) t.scrollBy({ left: d * t.clientWidth, behavior: "smooth" });
+  };
+  return (
+    <div className="carousel">
+      <div className="car-track" ref={track} onScroll={(e) => setI(Math.round(e.currentTarget.scrollLeft / (e.currentTarget.clientWidth || 1)))}>
+        {photos.map((p, n) => (
+          <button type="button" key={p.url} className="car-slide" onClick={() => onOpen?.(n)} aria-label={`${alt}, photo ${n + 1} of ${photos.length}. Tap to enlarge`}>
+            <img src={p.url} alt="" loading={n === 0 ? "eager" : "lazy"} draggable={false} />
+          </button>
+        ))}
+      </div>
+      {photos.length > 1 && (
+        <>
+          <button type="button" className="car-arrow prev" onClick={() => go(-1)} aria-label="Previous photo" hidden={i === 0}>‹</button>
+          <button type="button" className="car-arrow next" onClick={() => go(1)} aria-label="Next photo" hidden={i >= photos.length - 1}>›</button>
+          <div className="car-dots" aria-hidden="true">
+            {photos.map((_, n) => <i key={n} className={n === i ? "on" : ""} />)}
+          </div>
+        </>
+      )}
+    </div>
+  );
+}
+
+/** Full-screen photo viewer: swipe between photos, tap the cross or press Esc to close. */
+export function PhotoViewer({ photos, start, title, onClose }: { photos: Photo[]; start: number; title: string; onClose: () => void }) {
+  const track = useRef<HTMLDivElement>(null);
+  const [i, setI] = useState(start);
+  useEffect(() => {
+    const t = track.current;
+    if (t) t.scrollLeft = start * t.clientWidth;
+    const k = (e: KeyboardEvent) => e.key === "Escape" && onClose();
+    document.addEventListener("keydown", k);
+    document.body.classList.add("locked");
+    return () => {
+      document.removeEventListener("keydown", k);
+      document.body.classList.remove("locked");
+    };
+  }, [start, onClose]);
+  return (
+    <div className="viewer" role="dialog" aria-label={title}>
+      <div className="viewer-bar">
+        <span>{title}{photos.length > 1 ? ` · ${i + 1}/${photos.length}` : ""}</span>
+        <button type="button" className="icon-btn" onClick={onClose} aria-label="Close">{Icon.x}</button>
+      </div>
+      <div className="viewer-track" ref={track} onScroll={(e) => setI(Math.round(e.currentTarget.scrollLeft / (e.currentTarget.clientWidth || 1)))}>
+        {photos.map((p) => (
+          <div className="viewer-slide" key={p.url} onClick={onClose}>
+            <img src={p.url} alt="" />
+          </div>
+        ))}
+      </div>
     </div>
   );
 }

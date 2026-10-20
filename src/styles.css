@@ -119,7 +119,7 @@ h2.sec {
 .foot a { color: var(--muted); }
 
 /* ---------- tiles ---------- */
-.grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(min(100%, 230px), 1fr)); gap: 12px; }
+.grid { align-items: start; display: grid; grid-template-columns: repeat(auto-fill, minmax(min(100%, 230px), 1fr)); gap: 12px; }
 .tile {
   background: var(--surface); border-radius: var(--r); box-shadow: var(--shadow); padding: 14px;
   display: flex; flex-direction: column; gap: 12px; min-width: 0;
@@ -286,6 +286,41 @@ input[type="range"] { width: 100%; accent-color: var(--primary); }
 .toggle input:checked + i { background: var(--primary); }
 .toggle input:checked + i::after { transform: translateX(20px); }
 .toggle input:focus-visible + i { outline: 3px solid var(--primary); outline-offset: 2px; }
+
+/* ---------- product photos ---------- */
+.tile.photo { overflow: hidden; }
+.tile-id { display: flex; align-items: center; gap: 10px; min-width: 0; }
+.tile-id > div { min-width: 0; }
+.thumb { width: 52px; height: 52px; flex: none; border-radius: 8px; object-fit: cover; background: var(--sunk); }
+.carousel { position: relative; margin: -14px -14px 0; background: var(--sunk); }
+.car-track { display: flex; overflow-x: auto; scroll-snap-type: x mandatory; scrollbar-width: none; overscroll-behavior-x: contain; -webkit-overflow-scrolling: touch; }
+.car-track::-webkit-scrollbar { display: none; }
+.car-slide { flex: 0 0 100%; scroll-snap-align: center; scroll-snap-stop: always; aspect-ratio: 4 / 5; border: 0; padding: 0; margin: 0; background: none; cursor: zoom-in; }
+.car-slide img { width: 100%; height: 100%; object-fit: cover; display: block; }
+.car-dots { position: absolute; left: 0; right: 0; bottom: 10px; display: flex; justify-content: center; gap: 6px; pointer-events: none; }
+.car-dots i { width: 7px; height: 7px; border-radius: 50%; background: rgba(255,255,255,.55); box-shadow: 0 0 0 1px rgba(0,0,0,.25); }
+.car-dots i.on { background: #fff; transform: scale(1.25); }
+.car-arrow { position: absolute; top: 50%; transform: translateY(-50%); width: 40px; height: 40px; border-radius: 50%; border: 0; background: rgba(0,0,0,.5); color: #fff; font-size: 1.6rem; line-height: 1; display: none; align-items: center; justify-content: center; }
+.car-arrow.prev { left: 8px; }
+.car-arrow.next { right: 8px; }
+@media (hover: hover) and (pointer: fine) { .car-arrow:not([hidden]) { display: flex; } }
+.viewer { position: fixed; inset: 0; z-index: 30; background: rgba(0,0,0,.94); display: flex; flex-direction: column; }
+.viewer-bar { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: calc(10px + env(safe-area-inset-top, 0px)) max(14px, env(safe-area-inset-right, 0px)) 10px max(14px, env(safe-area-inset-left, 0px)); color: #fff; font-weight: 700; }
+.viewer-bar .icon-btn { color: #fff; border-color: rgba(255,255,255,.4); }
+.viewer-track { flex: 1; min-height: 0; display: flex; overflow-x: auto; scroll-snap-type: x mandatory; scrollbar-width: none; }
+.viewer-track::-webkit-scrollbar { display: none; }
+.viewer-slide { flex: 0 0 100%; scroll-snap-align: center; display: flex; align-items: center; justify-content: center; padding: 0 0 env(safe-area-inset-bottom, 0px); }
+.viewer-slide img { max-width: 100%; max-height: 100%; object-fit: contain; }
+.photos { display: grid; grid-template-columns: repeat(auto-fill, minmax(96px, 1fr)); gap: 10px; }
+.ph { position: relative; aspect-ratio: 1; border-radius: 8px; overflow: hidden; background: var(--sunk); border: 1.5px solid var(--line); }
+.ph img { width: 100%; height: 100%; object-fit: cover; display: block; }
+.ph.add { display: flex; align-items: center; justify-content: center; text-align: center; border-style: dashed; font-weight: 700; font-size: .85rem; padding: 6px; cursor: pointer; }
+.ph.add.busy { opacity: .6; }
+.ph-x { position: absolute; top: 4px; right: 4px; width: 28px; height: 28px; border-radius: 50%; border: 0; background: rgba(0,0,0,.65); color: #fff; display: flex; align-items: center; justify-content: center; padding: 0; }
+.ph-x svg { width: 14px; height: 14px; }
+.ph-main, .ph-make { position: absolute; left: 4px; bottom: 4px; font-size: .68rem; font-weight: 700; padding: 3px 7px; border-radius: 999px; border: 0; }
+.ph-main { background: var(--primary); color: var(--on-primary); }
+.ph-make { background: rgba(0,0,0,.65); color: #fff; }
 
 /* ---------- basket + tabs ---------- */
 .basket {

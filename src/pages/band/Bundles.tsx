@@ -5,8 +5,9 @@ import { useBand } from "../../state/band";
 import { useSettings } from "../../state/settings";
 import { useToast } from "../../state/toast";
 import { errorText, groupItems, money } from "../../lib/format";
-import { ConfirmButton, Icon, ImageField, Sheet, Toggle } from "../../components/ui";
-import type { Bundle, BundlePart } from "../../types";
+import { removeImage } from "../../lib/images";
+import { ConfirmButton, Icon, ImageField, PhotosField, Sheet, Toggle } from "../../components/ui";
+import type { Bundle, BundlePart, Photo } from "../../types";
 
 export default function Bundles() {
   const { bundles, items } = useBand();
@@ -57,6 +58,7 @@ function BundleSheet({ bundle, onClose }: { bundle: Bundle | null; onClose: () =
   const [price, setPrice] = useState(bundle ? String(bundle.price) : "");
   const [parts, setParts] = useState<BundlePart[]>(bundle?.parts?.length ? bundle.parts.map((p) => ({ ...p })) : [{ name: names[0] || "", qty: 1 }]);
   const [visible, setVisible] = useState(bundle?.visible ?? true);
+  const [photos, setPhotos] = useState<Photo[]>(bundle?.images ?? []);
   const [qr, setQr] = useState<{ url: string; path: string } | null>(bundle?.qrUrl ? { url: bundle.qrUrl, path: bundle.qrPath || "" } : null);
 
   const setPart = (i: number, p: Partial<BundlePart>) => setParts((ps) => ps.map((x, j) => (j === i ? { ...x, ...p } : x)));
@@ -73,8 +75,11 @@ function BundleSheet({ bundle, onClose }: { bundle: Bundle | null; onClose: () =
       visible,
       qrUrl: qr?.url ?? null,
       qrPath: qr?.path ?? null,
+      images: photos,
       order: bundle?.order ?? Math.max(0, ...bundles.map((b) => b.order ?? 0)) + 1,
     }).catch((x) => toast(errorText(x)));
+    const keep = new Set(photos.map((x) => x.path));
+    (bundle?.images ?? []).filter((x) => !keep.has(x.path)).forEach((x) => removeImage(x.path));
     toast("Bundle saved");
     onClose();
   };
@@ -104,6 +109,7 @@ function BundleSheet({ bundle, onClose }: { bundle: Bundle | null; onClose: () =
           <button type="button" className="btn ghost sm" onClick={() => setParts((ps) => [...ps, { name: names[0] || "", qty: 1 }])}>+ Add another item</button>
           <span className="hint">Pick the item, not the size. The seller chooses the size when selling.</span>
         </div>
+        <PhotosField label="Photos" photos={photos} onChange={setPhotos} hint="Fans scroll through these on the shop page. The first photo is the main one." />
         <ImageField label="Payment QR picture" folder="qr" url={qr?.url ?? null} onChange={setQr} />
         <Toggle id="bVisible" checked={visible} onChange={setVisible} label="Show on the fan page" />
         <button className="btn primary block">{bundle ? "Save bundle" : "Create bundle"}</button>

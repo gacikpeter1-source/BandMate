@@ -1,6 +1,6 @@
 rules_version = '2';
 
-// QR pictures and the band logo are public images (fans must see them).
+// QR pictures, product photos and the band logo are public images (fans must see them).
 // Only approved band mates and admins can upload or remove them.
 // Role is read from Firestore users/{uid}.role.
 service firebase.storage {
@@ -15,7 +15,7 @@ service firebase.storage {
     match /public/{folder}/{file} {
       allow read: if true;
       allow create, update: if isStaff()
-        && folder in ['qr', 'logo']
+        && folder in ['qr', 'logo', 'photos']
         && request.resource.size < 5 * 1024 * 1024
         && request.resource.contentType.matches('image/.*');
       allow delete: if isStaff();

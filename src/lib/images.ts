@@ -21,11 +21,12 @@ async function resize(file: File, max: number, type: "image/png" | "image/webp")
 }
 
 /** Shrinks the picture on the phone, then uploads it to Firebase Storage. */
-export async function uploadImage(file: File, folder: "qr" | "logo") {
+export async function uploadImage(file: File, folder: "qr" | "logo" | "photos") {
   if (!file.type.startsWith("image/")) throw new Error("Choose a picture file (PNG, JPG or WebP).");
   if (file.size > 20 * 1024 * 1024) throw new Error("That picture is over 20 MB. Use a screenshot instead.");
-  // QR codes stay PNG so the squares stay sharp; logos use WebP to keep transparency small.
-  const blob = await resize(file, folder === "qr" ? 1000 : 1600, folder === "qr" ? "image/png" : "image/webp");
+  // QR codes stay PNG so the squares stay sharp; logos and product photos use WebP to stay small.
+  const max = folder === "qr" ? 1000 : folder === "photos" ? 1400 : 1600;
+  const blob = await resize(file, max, folder === "qr" ? "image/png" : "image/webp");
   if (blob.size > 5 * 1024 * 1024) throw new Error("That picture is still over 5 MB after shrinking.");
   const type = blob.type || file.type;
   const ext = type.split("/")[1]?.replace("jpeg", "jpg") || "img";

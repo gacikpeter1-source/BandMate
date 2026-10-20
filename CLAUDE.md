@@ -19,8 +19,9 @@ Accounts made by `scripts/create-admin.mjs` are marked verified. Unverified Auth
 The admin is created by `scripts/create-admin.mjs` (Admin SDK), never from the client.
 
 ## Data model (Firestore)
-- `items/{id}`: name, variant (size), price, qrUrl, qrPath, visible, soldOut, order. Public if visible.
-  Sizes of one product share the same `name`; the UI groups by name.
+- `items/{id}`: name, variant (size), price, qrUrl, qrPath, images[{url,path}], visible, soldOut, order. Public if visible.
+  Sizes of one product share the same `name`; the UI groups by name. Photos belong to the product: the item
+  form writes the same `images` to every size of that name (first photo = main). `bundles` also have `images`.
 - `stock/{itemId}`: { qty } — staff only. Kept separate so fans can never read counts.
   `items.soldOut` is the only stock signal fans see; every stock write must update it.
 - `bundles/{id}`: name, price, parts[{name, qty}] (parts reference item *names*; size chosen at sale), qrUrl, visible, order.
@@ -28,7 +29,9 @@ The admin is created by `scripts/create-admin.mjs` (Admin SDK), never from the c
   Staff may only change `undone` after creation.
 - `settings/public`: bandName, tagline, currency, preset, theme{primary,bg,surface,text}, logoUrl, logoPath, logoOpacity, logoInHeader, topBar{enabled,email,links[{type,url}]}.
 - `settings/band`: { gig } — staff only.
-- Storage: `public/qr/*`, `public/logo/*` — public read, staff write, images < 5 MB.
+- Storage: `public/qr/*`, `public/logo/*`, `public/photos/*` — public read, staff write, images < 5 MB.
+  Photos are shrunk to 1400px WebP on the phone before upload (`src/lib/images.ts`); max 6 per product.
+  Fan page shows them in a swipeable `PhotoCarousel` with a full-screen `PhotoViewer` (`src/components/ui.tsx`).
 
 ## Conventions
 - All stock changes go through `src/lib/ops.ts` (batched `increment()`, works offline). Don't await

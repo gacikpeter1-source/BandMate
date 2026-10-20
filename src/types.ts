@@ -10,6 +10,12 @@ export interface UserProfile {
   approvedAt?: number | null;
 }
 
+/** A product photo stored in Firebase Storage (public/photos/*). */
+export interface Photo {
+  url: string;
+  path: string;
+}
+
 export interface Item {
   id: string;
   name: string;
@@ -20,6 +26,8 @@ export interface Item {
   visible: boolean;
   soldOut: boolean;
   order: number;
+  /** Shared by every size of the same product (kept in sync on save). First one is the main photo. */
+  images?: Photo[];
 }
 
 export interface BundlePart {
@@ -36,6 +44,7 @@ export interface Bundle {
   qrPath: string | null;
   visible: boolean;
   order: number;
+  images?: Photo[];
 }
 
 export interface Pick {

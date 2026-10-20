@@ -60,9 +60,12 @@ export default function Sell() {
           return (
             <article className="tile" key={g.key}>
               <div className="tile-top">
-                <div>
-                  <h3>{g.name}</h3>
-                  <div className="sub num">{left} in stock</div>
+                <div className="tile-id">
+                  {g.items.find((i) => i.images?.length)?.images?.[0] && <img className="thumb" src={g.items.find((i) => i.images?.length)!.images![0].url} alt="" />}
+                  <div>
+                    <h3>{g.name}</h3>
+                    <div className="sub num">{left} in stock</div>
+                  </div>
                 </div>
                 <span className="tag">{priceTag(g.items, cur)}</span>
               </div>
@@ -96,9 +99,12 @@ export default function Sell() {
               return (
                 <article className="tile bundle" key={b.id}>
                   <div className="tile-top">
-                    <div>
-                      <h3>{b.name}</h3>
-                      <div className="sub">{b.parts.map((p) => `${p.qty > 1 ? p.qty + "× " : ""}${p.name}`).join(" + ")}</div>
+                    <div className="tile-id">
+                      {b.images?.[0] && <img className="thumb" src={b.images[0].url} alt="" />}
+                      <div>
+                        <h3>{b.name}</h3>
+                        <div className="sub">{b.parts.map((p) => `${p.qty > 1 ? p.qty + "× " : ""}${p.name}`).join(" + ")}</div>
+                      </div>
                     </div>
                     <span className="tag">{money(b.price, cur)}</span>
                   </div>
