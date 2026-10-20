@@ -47,6 +47,7 @@ export default function Stock() {
           <p>Add each product with its sizes and how many pieces you have. Example: T-shirt, sizes “S, M, L, XL”, 20 pieces each.</p>
         </div>
       )}
+      <div className="flow">
       {groups.map((g) => {
         const total = g.items.reduce((t, i) => t + (stock[i.id] ?? 0), 0);
         return (
@@ -83,6 +84,7 @@ export default function Stock() {
           </section>
         );
       })}
+      </div>
       {edit && <ItemSheet item={edit === "new" ? null : edit} onClose={() => setEdit(null)} />}
       {restock && <RestockSheet item={restock} onClose={() => setRestock(null)} />}
       {zoom && <QrFull src={zoom.qrUrl} title={itemLabel(zoom)} sub={money(zoom.price, cur)} onClose={() => setZoom(null)} />}

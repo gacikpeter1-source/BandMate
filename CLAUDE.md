@@ -34,6 +34,18 @@ The admin is created by `scripts/create-admin.mjs` (Admin SDK), never from the c
   always-white QR surfaces.
 - If you change a rule, add or update a case in `tests/rules.test.mjs`.
 
+## Layout: mobile first
+Design for a phone in one hand first (320-430px), then scale up. Never assume a wide screen.
+- Content width is the `--maxw` token in `src/styles.css` (820px, 1120px from 1100px wide, 1360px from 1700px).
+  Use it for every page-level container instead of a fixed pixel width.
+- Use `.flow` (CSS `column-width: 440px`) to put cards or groups side by side only when each column
+  can be 440px wide. Phones and tablets in portrait stay one column; no extra breakpoints needed.
+- Tap targets at least 44px, bottom tab bar and sheets respect `env(safe-area-inset-*)`.
+- Before shipping UI changes, check 320, 390, 820 (tablet), 1440 and 1920 wide, plus 844x390 landscape,
+  and make sure `document.documentElement.scrollWidth <= innerWidth` (no sideways scroll).
+  Run against emulators (`npm run emulators`, `VITE_USE_EMULATORS=true VITE_FIREBASE_PROJECT_ID=demo-bandmate`)
+  with `node scripts/create-admin.mjs ... --sample` for test data.
+
 ## Commands
 - `npm run dev` — local dev (needs `.env.local`, see `.env.example`)
 - `npm run build` — typecheck + build (run before every commit)

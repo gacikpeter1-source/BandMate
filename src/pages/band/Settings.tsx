@@ -18,12 +18,12 @@ const CURRENCIES = ["€", "Kč", "zł", "Ft", "£", "$", "kr", "CHF"];
 
 export default function SettingsPage() {
   return (
-    <>
+    <div className="flow">
       <BandSection />
       <LookSection />
       <TopBarSection />
       <AccountSection />
-    </>
+    </div>
   );
 }
 
