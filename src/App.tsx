@@ -15,6 +15,8 @@ import { Login, Register } from "./pages/AuthPages";
 import BandApp from "./pages/band/BandApp";
 import PlatformHome from "./pages/platform/PlatformHome";
 import PlatformConsole from "./pages/platform/PlatformConsole";
+import StartPage from "./pages/platform/StartPage";
+import TermsPage from "./pages/platform/TermsPage";
 
 export default function App() {
   if (!firebaseConfigured) {
@@ -99,7 +101,11 @@ function PlatformApp() {
           <ToastProvider>
             <Routes>
               <Route path="/" element={<PlatformHome />} />
-              <Route path="/platform/login" element={<Login platform />} />
+              <Route path="/start" element={<StartPage />} />
+              <Route path="/start/login" element={<Login variant="customer" />} />
+              <Route path="/start/register" element={<Register variant="customer" />} />
+              <Route path="/terms" element={<TermsPage />} />
+              <Route path="/platform/login" element={<Login variant="operator" />} />
               <Route path="/platform" element={<PlatformConsole />} />
               <Route path="*" element={<Navigate to="/" replace />} />
             </Routes>

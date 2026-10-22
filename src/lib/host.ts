@@ -31,3 +31,11 @@ export function platformAdminUrl() {
   const path = "/platform/login";
   return isPlatformHost() ? path : `https://${PLATFORM_HOST}${path}`;
 }
+
+/** Where a band lives from the BandMate address: its own <bandId>.bandmate.shop on the real site,
+ *  /b/<bandId> while testing on localhost or a Vercel preview link. */
+export function bandUrl(bandId: string, path = "") {
+  const h = window.location.hostname;
+  if (h === PLATFORM_HOST || h === `www.${PLATFORM_HOST}`) return `https://${bandId}.${PLATFORM_HOST}${path}`;
+  return `/b/${bandId}${path}`;
+}

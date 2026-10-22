@@ -38,6 +38,32 @@ service cloud.firestore {
       allow list, write: if platformAdmin();
     }
 
+    // A founder's request for a new band space: one per verified account (doc id = their uid).
+    // Only the operator can approve it (which creates the band); the founder can read and withdraw it.
+    match /bandRequests/{uid} {
+      allow read: if (verified() && request.auth.uid == uid) || platformAdmin();
+      allow create: if verified()
+        && request.auth.uid == uid
+        && request.resource.data.keys().hasOnly(['uid', 'email', 'displayName', 'bandName', 'bandId', 'domain', 'termsVersion', 'termsAcceptedAt', 'status', 'createdAt'])
+        && request.resource.data.keys().hasAll(['uid', 'email', 'displayName', 'bandName', 'bandId', 'termsVersion', 'termsAcceptedAt', 'status', 'createdAt'])
+        && request.resource.data.uid == uid
+        && request.resource.data.email == request.auth.token.email
+        && request.resource.data.status == 'pending'
+        && request.resource.data.termsAcceptedAt == request.time
+        && request.resource.data.termsVersion is string
+        && request.resource.data.displayName is string && request.resource.data.displayName.size() <= 80
+        && request.resource.data.bandName is string
+        && request.resource.data.bandName.size() >= 2 && request.resource.data.bandName.size() <= 60
+        && request.resource.data.bandId is string
+        && request.resource.data.bandId.size() >= 3 && request.resource.data.bandId.size() <= 40
+        && request.resource.data.bandId.matches('^[a-z0-9]+(-[a-z0-9]+)*$')
+        && !(request.resource.data.bandId in ['www', 'app', 'admin', 'api', 'mail', 'platform', 'static', 'assets', 'cdn', 'help', 'support', 'status', 'docs', 'blog', 'login', 'b'])
+        && !exists(/databases/$(database)/documents/bands/$(request.resource.data.bandId))
+        && (!('domain' in request.resource.data) || (request.resource.data.domain is string && request.resource.data.domain.size() <= 253));
+      allow update: if platformAdmin();
+      allow delete: if (verified() && request.auth.uid == uid && resource.data.status in ['pending', 'rejected']) || platformAdmin();
+    }
+
     match /bands/{bandId} {
       function bandRef() { return /databases/$(database)/documents/bands/$(bandId); }
       function memberRef() { return /databases/$(database)/documents/bands/$(bandId)/members/$(request.auth.uid); }

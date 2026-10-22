@@ -27,7 +27,15 @@ email/password, Firestore, Storage), hosted on Vercel, code on GitHub. Setup ste
   the operator still can.
 - Operator ("BandMate admin") = a doc in `platformAdmins/{uid}`, created only by script. Full access to all bands.
   The "BandMate admin" link appears only on a band's login screen, never when signed in.
-- Create a band: `node scripts/create-band.mjs <bandId> "<Name>" <adminEmail> [--domain host] [--sample]`.
+- Getting a band (self-service): bandmate.shop home -> "Register your band" (`/start`, `src/pages/platform/StartPage.tsx`).
+  A verified account files ONE request (`bandRequests/{uid}`: band name, wanted address = future `bandId`, optional own
+  domain, `termsVersion` + server-stamped `termsAcceptedAt`). The operator approves it in `/platform`
+  (`approveBandRequest` in `src/lib/platform.ts`, one transaction: band, default settings, founder as `admin` member,
+  optional `domains` entry) or rejects it. The founder sees the result at `/start` and signs in again at the band's own
+  address (sign-in is per address). Terms text is a PLACEHOLDER (`TermsPage.tsx`); bump `TERMS_VERSION` when it changes.
+  Payment is not part of this yet: approval is the gate until Stripe exists.
+- Operator console (`/platform`): pending requests, all bands, pause/resume, add a band's own domain.
+- Create a band by script: `node scripts/create-band.mjs <bandId> "<Name>" <adminEmail> [--domain host] [--sample]`.
   Create the operator: `node scripts/create-platform-admin.mjs <email>`. A band's own custom domain also has to be added
   to the Vercel project and to Firebase Auth -> Authorized domains by hand for now (without that, the
   verification email is still sent, just without its "continue" button). `*.bandmate.shop` needs the wildcard
@@ -49,7 +57,8 @@ Accounts made by the scripts are marked verified. Unverified Auth accounts stay 
 (no cleanup job yet) but have no data or access.
 
 ## Data model (Firestore, everything under `bands/{bandId}/` unless noted)
-- Top level: `bands/{bandId}` {name, status, createdAt}, `domains/{host}` {bandId}, `platformAdmins/{uid}`.
+- Top level: `bands/{bandId}` {name, status, createdAt}, `domains/{host}` {bandId}, `platformAdmins/{uid}`,
+  `bandRequests/{uid}` (see Tenancy; only the founder and the operator can read it).
 - `members/{uid}`: email, displayName, role, createdAt.
 - `items/{id}`: name, variant (size), price, qrUrl, qrPath, images[{url,path}], visible, soldOut, order. Public if visible.
   Sizes of one product share the same `name`; the UI groups by name. Photos belong to the product: the item
@@ -105,7 +114,7 @@ Add the Vercel domain (and every band domain) to Firebase Auth → Settings → 
 verification email link will fail there.
 
 ## Ideas not built yet
-Planned in order: operator screen to create/pause bands and map domains; public "request a band space" form
-(verified account, terms checkbox stored with version and time); bandname.yourapp.com subdomains and automatic
-domain setup (needs Vercel token + Cloud Functions); Slovak/English; Stripe (band subscription, then Connect so
-sales payments go to each band; manual QR payments stay). Also: CSV export of sales, low-stock alerts.
+Planned in order: automatic Vercel/Firebase setup for a band's own domain (needs Vercel token + Cloud Functions) and
+an email to the founder when approved; Slovak/English; Stripe (band subscription replaces manual approval, then
+Connect so sales payments go to each band; manual QR payments stay); cleanup of unverified accounts.
+Also: CSV export of sales, low-stock alerts, final terms text.

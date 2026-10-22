@@ -115,3 +115,20 @@ export interface PublicSettings {
 export interface BandSettings {
   gig: string;
 }
+
+/** A band's request for its own space, filed by a verified account at /start. One per account (doc id = uid). */
+export interface BandRequest {
+  id: string;
+  uid: string;
+  email: string;
+  displayName: string;
+  bandName: string;
+  /** The wanted address: <bandId>.bandmate.shop. Final once the operator approves. */
+  bandId: string;
+  /** Optional domain the band already owns. */
+  domain?: string;
+  termsVersion: string;
+  termsAcceptedAt: unknown;
+  status: "pending" | "approved" | "rejected";
+  createdAt: number;
+}

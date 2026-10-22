@@ -287,6 +287,13 @@ input[type="range"] { width: 100%; accent-color: var(--primary); }
 .toggle input:checked + i::after { transform: translateX(20px); }
 .toggle input:focus-visible + i { outline: 3px solid var(--primary); outline-offset: 2px; }
 
+/* ---------- band registration ---------- */
+.addr { display: flex; align-items: stretch; min-width: 0; }
+.addr input { border-top-right-radius: 0; border-bottom-right-radius: 0; min-width: 0; }
+.addr span { display: flex; align-items: center; padding: 0 12px; background: var(--sunk); border: 1.5px solid var(--line); border-left: 0; border-radius: 0 8px 8px 0; color: var(--muted); font-size: .9rem; white-space: nowrap; }
+.check { display: flex; gap: 12px; align-items: flex-start; line-height: 1.35; }
+.check input { width: 22px; height: 22px; flex: none; margin: 1px 0 0; accent-color: var(--primary); }
+
 /* ---------- product photos ---------- */
 .tile.photo { overflow: hidden; }
 .tile-id { display: flex; align-items: center; gap: 10px; min-width: 0; }

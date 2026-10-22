@@ -207,3 +207,38 @@ test("storage: only a band's own staff upload into that band's folder; everyone 
   await assertFails(up(authed(ids.mateA), "private/x.png"));
   await assertSucceeds(up(authed(ids.platform), "bands/b/photos/p.png")); // operator
 });
+
+test("band requests: one per verified account, valid address, terms stamped by the server, operator approves", async () => {
+  const { serverTimestamp } = await import("firebase/firestore");
+  const req = (over = {}) => ({
+    uid: "u-founder", email: "founder@x.com", displayName: "Founder", bandName: "Helloween", bandId: "helloween",
+    termsVersion: "v1", termsAcceptedAt: serverTimestamp(), status: "pending", createdAt: 1, ...over,
+  });
+  const founder = as("u-founder", "founder@x.com");
+  const mine = (db) => doc(db, "bandRequests", "u-founder");
+  await assertFails(setDoc(doc(fan(), "bandRequests", "u-founder"), req())); // not signed in
+  await assertFails(setDoc(mine(as("u-founder", "founder@x.com", false)), req())); // unverified email
+  await assertFails(setDoc(doc(as("u-other", "o@x.com"), "bandRequests", "u-founder"), req())); // someone else's slot
+  await assertFails(setDoc(mine(founder), req({ email: "other@x.com" }))); // not their email
+  await assertFails(setDoc(mine(founder), req({ status: "approved" }))); // cannot approve itself
+  await assertFails(setDoc(mine(founder), req({ termsAcceptedAt: 123 }))); // terms time must come from the server
+  await assertFails(setDoc(mine(founder), req({ bandId: "admin" }))); // reserved
+  await assertFails(setDoc(mine(founder), req({ bandId: "Bad Id" }))); // not a valid address
+  await assertFails(setDoc(mine(founder), req({ bandId: "ab" }))); // too short
+  await assertFails(setDoc(mine(founder), req({ bandId: "a" }))); // an existing band
+  await assertFails(setDoc(mine(founder), req({ bandName: "x" }))); // name too short
+  await assertFails(setDoc(mine(founder), { ...req(), role: "admin" })); // no extra fields
+  await assertSucceeds(setDoc(mine(founder), req()));
+  await assertSucceeds(setDoc(doc(as("u-founder2", "f2@x.com"), "bandRequests", "u-founder2"), req({ uid: "u-founder2", email: "f2@x.com", bandId: "second-band", domain: "merch.second.com" }))); // optional own domain
+  await assertFails(setDoc(mine(founder), req({ bandName: "Changed" }))); // already filed: cannot overwrite
+  await assertFails(updateDoc(mine(founder), { status: "approved" })); // cannot approve itself
+  await assertSucceeds(getDoc(mine(founder))); // can read their own
+  await assertFails(getDoc(doc(as("u-other", "o@x.com"), "bandRequests", "u-founder"))); // not others'
+  await assertFails(getDocs(collection(founder, "bandRequests"))); // no listing
+  await assertFails(getDocs(collection(as(ids.adminA), "bandRequests"))); // a band admin is not the operator
+  const op = as(ids.platform);
+  await assertSucceeds(getDocs(collection(op, "bandRequests")));
+  await assertSucceeds(updateDoc(mine(op), { status: "approved" }));
+  await assertFails(deleteDoc(mine(founder))); // approved: the founder can no longer withdraw it
+  await assertSucceeds(deleteDoc(doc(as("u-founder2", "f2@x.com"), "bandRequests", "u-founder2"))); // a pending one can be withdrawn
+});

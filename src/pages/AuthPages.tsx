@@ -29,10 +29,11 @@ function Shell({ title, children }: { title: string; children: ReactNode }) {
   );
 }
 
-/** `platform` = the BandMate operator's own login (/platform/login), not a band's. */
-export function Login({ platform = false }: { platform?: boolean }) {
+/** band = a band's own login; operator = BandMate admin (/platform/login);
+ *  customer = someone registering a band at bandmate.shop (/start/login). */
+export function Login({ variant = "band" }: { variant?: "band" | "operator" | "customer" }) {
   const nav = useNavigate();
-  const after = platform ? "/platform" : "/band";
+  const after = variant === "operator" ? "/platform" : variant === "customer" ? "/start" : "/band";
   const { user, ready } = useAuth();
   const [email, setEmail] = useState("");
   const [pw, setPw] = useState("");
@@ -56,7 +57,7 @@ export function Login({ platform = false }: { platform?: boolean }) {
   };
 
   return (
-    <Shell title={platform ? "BandMate admin" : "Band login"}>
+    <Shell title={variant === "operator" ? "BandMate admin" : variant === "customer" ? "Sign in" : "Band login"}>
       <form onSubmit={submit} className="stack">
         <div className="field">
           <label htmlFor="lEmail">Email</label>
@@ -88,7 +89,12 @@ export function Login({ platform = false }: { platform?: boolean }) {
           Forgot password?
         </button>
       </form>
-      {!platform && (
+      {variant === "customer" && (
+        <p className="note center">
+          New here? <Link to="/start/register">Create an account</Link>
+        </p>
+      )}
+      {variant === "band" && (
         <>
           <p className="note center">
             New band member? <Link to="/register">Create an account</Link>
@@ -103,15 +109,17 @@ export function Login({ platform = false }: { platform?: boolean }) {
   );
 }
 
-export function Register() {
+/** band = joining a band's team (waits for that band's admin); customer = account for registering a band. */
+export function Register({ variant = "band" }: { variant?: "band" | "customer" }) {
   const nav = useNavigate();
+  const after = variant === "customer" ? "/start" : "/band";
   const { user, ready } = useAuth();
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
   const [pw, setPw] = useState("");
   const [err, setErr] = useState("");
   const [busy, setBusy] = useState(false);
-  if (ready && user) return <Navigate to="/band" replace />;
+  if (ready && user) return <Navigate to={after} replace />;
 
   const submit = async (e: FormEvent) => {
     e.preventDefault();
@@ -119,12 +127,12 @@ export function Register() {
     setBusy(true);
     setErr("");
     try {
-      setPendingName(name.trim());
+      if (variant === "band") setPendingName(name.trim());
       const cred = await createUserWithEmailAndPassword(auth, email.trim(), pw);
       await updateProfile(cred.user, { displayName: name.trim() }).catch(() => {});
       // If this fails the next screen has a "Send again" button, so it is not fatal.
       await sendVerification(cred.user).catch(() => {});
-      nav("/band");
+      nav(after);
     } catch (x) {
       setErr(errorText(x));
       setBusy(false);
@@ -132,8 +140,12 @@ export function Register() {
   };
 
   return (
-    <Shell title="Join the band desk">
-      <p className="note">We email you a link to confirm your address. After that, the admin approves your account and makes you a BandMate.</p>
+    <Shell title={variant === "customer" ? "Create your account" : "Join the band desk"}>
+      <p className="note">
+        {variant === "customer"
+          ? "We email you a link to confirm your address. Then you can register your band."
+          : "We email you a link to confirm your address. After that, the admin approves your account and makes you a BandMate."}
+      </p>
       <form onSubmit={submit} className="stack">
         <div className="field">
           <label htmlFor="rName">Your name</label>
@@ -154,7 +166,7 @@ export function Register() {
         </button>
       </form>
       <p className="note center">
-        Already have an account? <Link to="/login">Sign in</Link>
+        Already have an account? <Link to={variant === "customer" ? "/start/login" : "/login"}>Sign in</Link>
       </p>
     </Shell>
   );
