@@ -27,7 +27,7 @@ email/password, Firestore, Storage), hosted on Vercel, code on GitHub. Setup ste
   the operator still can.
 - Operator ("BandMate admin") = a doc in `platformAdmins/{uid}`, created only by script. Full access to all bands.
   The "BandMate admin" link appears only on a band's login screen, never when signed in.
-- Getting a band (self-service): bandmate.shop home -> "Register your band" (`/start`, `src/pages/platform/StartPage.tsx`).
+- Getting a band (self-service): bandmate.shop home -> "Start Your TeamMate" button (`/start`, `src/pages/platform/StartPage.tsx`).
   A verified account files ONE request (`bandRequests/{uid}`: band name, wanted address = future `bandId`, optional own
   domain, `termsVersion` + server-stamped `termsAcceptedAt`). The operator approves it in `/platform`
   (`approveBandRequest` in `src/lib/platform.ts`, one transaction: band, default settings, founder as `admin` member,
