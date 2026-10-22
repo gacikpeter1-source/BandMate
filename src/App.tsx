@@ -2,7 +2,7 @@ import { Route, Routes, useParams } from "react-router-dom";
 import { Navigate } from "./lib/nav";
 import { doc } from "firebase/firestore";
 import { db, firebaseConfigured } from "./firebase";
-import { isPlatformHost } from "./lib/host";
+import { isPlatformHost, subdomainBandId } from "./lib/host";
 import { useLiveDoc } from "./lib/live";
 import { AuthProvider } from "./state/auth";
 import { SettingsProvider } from "./state/settings";
@@ -65,7 +65,9 @@ function PathBand() {
 function HostBand({ host }: { host: string }) {
   const d = useLiveDoc<{ bandId: string }>(() => doc(db, "domains", host), `domain-${host}`);
   if (!d.ready) return <main className="page"><div className="wrap"><Loading /></div></main>;
-  if (!d.data?.bandId)
+  // An address listed in `domains` wins; otherwise <bandId>.bandmate.shop opens that band.
+  const bandId = d.data?.bandId || subdomainBandId(host);
+  if (!bandId)
     return (
       <main className="page auth">
         <div className="authcard">
@@ -74,7 +76,7 @@ function HostBand({ host }: { host: string }) {
         </div>
       </main>
     );
-  return <BandShell bandId={d.data.bandId} base="" />;
+  return <BandShell bandId={bandId} base="" />;
 }
 
 function BandRoutes() {

@@ -33,7 +33,9 @@ export function parseArgs(argv) {
 }
 export const list = (v) => (v === undefined || v === true ? [] : [].concat(v));
 
-export const validBandId = (id) => /^[a-z0-9]+(-[a-z0-9]+)*$/.test(id) && id.length >= 3 && id.length <= 40;
+// Keep in sync with RESERVED_BAND_IDS in src/lib/host.ts (these belong to BandMate itself).
+export const RESERVED_BAND_IDS = ["www", "app", "admin", "api", "mail", "platform", "static", "assets", "cdn", "help", "support", "status", "docs", "blog", "login", "b"];
+export const validBandId = (id) => /^[a-z0-9]+(-[a-z0-9]+)*$/.test(id) && id.length >= 3 && id.length <= 40 && !RESERVED_BAND_IDS.includes(id);
 
 /** Finds the login for this email or creates a verified one. A new account gets a random password
  *  (or the one given with --password); the person sets their own with "Forgot password?". */

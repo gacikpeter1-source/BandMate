@@ -1,9 +1,9 @@
 import { useEffect, useState } from "react";
 import { Link } from "../lib/nav";
-import { sendEmailVerification, signOut } from "firebase/auth";
+import { signOut } from "firebase/auth";
 import { auth } from "../firebase";
 import { errorText } from "../lib/format";
-import { verifyLinkSettings } from "../lib/verify";
+import { sendVerification } from "../lib/verify";
 import { useAuth } from "../state/auth";
 
 const RESEND_SECONDS = 60;
@@ -42,7 +42,7 @@ export default function VerifyEmail() {
     setErr("");
     setMsg("");
     try {
-      await sendEmailVerification(auth.currentUser, verifyLinkSettings());
+      await sendVerification(auth.currentUser);
       setMsg("Sent. Check your inbox and your spam folder.");
       setWait(RESEND_SECONDS);
     } catch (x) {

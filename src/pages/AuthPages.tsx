@@ -1,9 +1,9 @@
 import { useState, type FormEvent, type ReactNode } from "react";
 import { Link, Navigate, useNavigate } from "../lib/nav";
-import { createUserWithEmailAndPassword, sendEmailVerification, sendPasswordResetEmail, signInWithEmailAndPassword, updateProfile } from "firebase/auth";
+import { createUserWithEmailAndPassword, sendPasswordResetEmail, signInWithEmailAndPassword, updateProfile } from "firebase/auth";
 import { auth } from "../firebase";
 import { errorText } from "../lib/format";
-import { verifyLinkSettings } from "../lib/verify";
+import { sendVerification } from "../lib/verify";
 import { setPendingName, useAuth } from "../state/auth";
 import { useSettings } from "../state/settings";
 import { LogoBackdrop } from "../components/brand";
@@ -123,7 +123,7 @@ export function Register() {
       const cred = await createUserWithEmailAndPassword(auth, email.trim(), pw);
       await updateProfile(cred.user, { displayName: name.trim() }).catch(() => {});
       // If this fails the next screen has a "Send again" button, so it is not fatal.
-      await sendEmailVerification(cred.user, verifyLinkSettings()).catch(() => {});
+      await sendVerification(cred.user).catch(() => {});
       nav("/band");
     } catch (x) {
       setErr(errorText(x));

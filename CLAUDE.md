@@ -9,10 +9,13 @@ email/password, Firestore, Storage), hosted on Vercel, code on GitHub. Setup ste
   under `bands/{bandId}/...` and its pictures under `bands/{bandId}/{qr|logo|photos}/...`. Never use the band
   *name* in a path; the name is display text only and can change.
 - The address decides the band (`src/lib/host.ts`, `src/App.tsx`):
-  - BandMate's own address (`VITE_PLATFORM_HOST`, localhost, `*.vercel.app`) = platform: home page at `/`,
-    operator console at `/platform`, operator login at `/platform/login`, and every band at `/b/<bandId>/...`.
-  - Any other address (`bandname.yourapp.com`, a band's own domain) = the band named in `domains/{host}`
-    (`{ bandId }`), served at the root. Unknown address -> "Address not set up".
+  - BandMate's own address (`VITE_PLATFORM_HOST`, default `bandmate.shop`; also localhost, `*.vercel.app`) = platform:
+    home page at `/`, operator console at `/platform`, operator login at `/platform/login`, and every band at
+    `/b/<bandId>/...`.
+  - `<bandId>.bandmate.shop` = that band, served at the root, with no per-band setup (`subdomainBandId`).
+    Reserved names (www, app, admin, ... see `RESERVED_BAND_IDS`) can never be band ids.
+  - Any other address (a band's own domain) = the band named in `domains/{host}` (`{ bandId }`), served at the
+    root. An exact `domains` match wins over the subdomain rule. Unknown address -> "Address not set up".
 - `TenantProvider` (`src/state/tenant.tsx`) sets the band for the page and `src/lib/scope.ts`
   (`bandCol`, `bandDoc`, `bandPath`, `getBandId`, `getBase`) so non-React code builds per-band paths.
   Pages use `src/lib/nav.tsx` (`Link`, `NavLink`, `Navigate`, `useNavigate`), which add the `/b/<bandId>` prefix
@@ -25,8 +28,10 @@ email/password, Firestore, Storage), hosted on Vercel, code on GitHub. Setup ste
 - Operator ("BandMate admin") = a doc in `platformAdmins/{uid}`, created only by script. Full access to all bands.
   The "BandMate admin" link appears only on a band's login screen, never when signed in.
 - Create a band: `node scripts/create-band.mjs <bandId> "<Name>" <adminEmail> [--domain host] [--sample]`.
-  Create the operator: `node scripts/create-platform-admin.mjs <email>`. A new custom domain also has to be added
-  to the Vercel project and to Firebase Auth -> Authorized domains (for the verification-email link) by hand for now.
+  Create the operator: `node scripts/create-platform-admin.mjs <email>`. A band's own custom domain also has to be added
+  to the Vercel project and to Firebase Auth -> Authorized domains by hand for now (without that, the
+  verification email is still sent, just without its "continue" button). `*.bandmate.shop` needs the wildcard
+  domain added in Vercel (Vercel DNS).
 
 ## Roles (source of truth: `firestore.rules`, `storage.rules`; tests in `tests/rules.test.mjs`)
 Roles live in `bands/{bandId}/members/{uid}.role`:
