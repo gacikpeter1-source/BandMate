@@ -434,6 +434,14 @@ export const en = {
   "start.openBand": "Open my band",
   "con.alreadyMember": "Already in: {list}",
   "con.errAlreadyMember": "{email} already belongs to “{band}”. One email can register only one band, so reject this request.",
+  "con.delete": "Delete this band",
+  "con.deleteTitle": "Delete “{name}” for good?",
+  "con.deleteWarn": "This erases the band's products, stock, sales, team, photos and addresses. It can't be undone. People's logins stay, but they leave this band.",
+  "con.deleteType": "Type {id} to confirm",
+  "con.deleteGo": "Delete for good",
+  "con.deleting": "Deleting…",
+  "con.deleted": "{name} deleted",
+  "con.deleteFailed": "Couldn't finish deleting. Try again; what is already deleted stays deleted.",
 } as const;
 
 export type Key = keyof typeof en;

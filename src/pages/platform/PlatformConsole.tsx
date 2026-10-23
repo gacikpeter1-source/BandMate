@@ -5,14 +5,14 @@ import { query, where } from "firebase/firestore";
 import { auth } from "../../firebase";
 import { PLATFORM_HOST } from "../../lib/host";
 import { activeBands, fetchMyBands, type MyBand } from "../../lib/memberships";
-import { addBandDomain, approveBandRequest, bandsCol, domainsCol, rejectBandRequest, requestsCol, setBandStatus } from "../../lib/platform";
+import { addBandDomain, approveBandRequest, bandsCol, deleteBand, domainsCol, rejectBandRequest, requestsCol, setBandStatus } from "../../lib/platform";
 import { useLiveQuery } from "../../lib/live";
 import { errorText } from "../../lib/format";
 import { useAuth } from "../../state/auth";
 import { useToast } from "../../state/toast";
 import { useT } from "../../i18n";
 import LangSwitch from "../../components/LangSwitch";
-import { Loading } from "../../components/ui";
+import { Loading, Sheet } from "../../components/ui";
 import type { BandInfo } from "../../state/tenant";
 import type { BandRequest } from "../../types";
 
@@ -29,6 +29,10 @@ export default function PlatformConsole() {
   const requests = useLiveQuery<BandRequest>(() => (isPlatform ? query(requestsCol(), where("status", "==", "pending")) : null), `platform-requests-${isPlatform}`);
   const [newDomain, setNewDomain] = useState<Record<string, string>>({});
   const [busy, setBusy] = useState("");
+  const [del, setDel] = useState<BandRow | null>(null);
+  const [delText, setDelText] = useState("");
+  const [deleting, setDeleting] = useState(false);
+  const [delErr, setDelErr] = useState("");
   // Is the person behind each pending request already working in a band? (one email, one band)
   const [inBands, setInBands] = useState<Record<string, MyBand[]>>({});
   const emailsKey = requests.data.map((r) => r.email).join("|");
@@ -108,6 +112,7 @@ export default function PlatformConsole() {
                 <button className="btn ghost" disabled={busy === b.id} onClick={() => run(b.id, setBandStatus(b.id, b.status === "active" ? "paused" : "active"), b.status === "active" ? t("con.paused", { name: b.name }) : t("con.live", { name: b.name }))}>
                   {b.status === "active" ? t("con.pause") : t("con.resume")}
                 </button>
+                <button className="btn danger" onClick={() => { setDel(b); setDelText(""); setDelErr(""); }}>{t("con.delete")}</button>
               </div>
               <form
                 className="row-form"
@@ -125,6 +130,33 @@ export default function PlatformConsole() {
         )}
         <button className="btn ghost block" onClick={() => signOut(auth)}>{t("common.signOut")}</button>
       </div>
+      {del && (
+        <Sheet title={t("con.deleteTitle", { name: del.name })} onClose={() => !deleting && setDel(null)}>
+          <p className="note">{t("con.deleteWarn")}</p>
+          <div className="field">
+            <label htmlFor="delConfirm">{t("con.deleteType", { id: del.id })}</label>
+            <input id="delConfirm" value={delText} autoCapitalize="none" autoCorrect="off" spellCheck={false} disabled={deleting} onChange={(e) => setDelText(e.target.value)} />
+          </div>
+          {delErr && <p className="hint err">{delErr}</p>}
+          <button
+            className="btn danger block"
+            disabled={delText.trim() !== del.id || deleting}
+            onClick={() => {
+              setDeleting(true);
+              setDelErr("");
+              deleteBand(del.id)
+                .then(() => {
+                  toast(t("con.deleted", { name: del.name }));
+                  setDel(null);
+                })
+                .catch(() => setDelErr(t("con.deleteFailed")))
+                .finally(() => setDeleting(false));
+            }}
+          >
+            {deleting ? t("con.deleting") : t("con.deleteGo")}
+          </button>
+        </Sheet>
+      )}
     </main>
   );
 }

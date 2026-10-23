@@ -1,6 +1,7 @@
 // Everything only the BandMate operator, or a new band's founder at /start, touches.
-import { collection, doc, getDoc, runTransaction, serverTimestamp, setDoc, updateDoc, deleteDoc } from "firebase/firestore";
-import { db } from "../firebase";
+import { collection, deleteDoc, doc, getDoc, getDocs, limit, query, runTransaction, serverTimestamp, setDoc, updateDoc, where, writeBatch, type CollectionReference } from "firebase/firestore";
+import { deleteObject, listAll, ref } from "firebase/storage";
+import { db, storage } from "../firebase";
 import { RESERVED_BAND_IDS } from "./host";
 import { tr } from "../i18n";
 import { DEFAULT_SETTINGS } from "../state/settings";
@@ -87,3 +88,33 @@ export const setBandStatus = (bandId: string, status: "active" | "paused") => up
 
 export const addBandDomain = (host: string, bandId: string) =>
   setDoc(doc(db, "domains", host.trim().toLowerCase().replace(/^https?:\/\//, "").replace(/\/.*$/, "")), { bandId });
+
+async function deleteAllIn(col: CollectionReference) {
+  for (;;) {
+    const snap = await getDocs(query(col, limit(400)));
+    if (snap.empty) return;
+    const b = writeBatch(db);
+    snap.docs.forEach((d) => b.delete(d.ref));
+    await b.commit();
+  }
+}
+
+async function deleteStorageFolder(path: string) {
+  const res = await listAll(ref(storage, path));
+  await Promise.all(res.items.map((i) => deleteObject(i)));
+  for (const p of res.prefixes) await deleteStorageFolder(p.fullPath);
+}
+
+/** Erases a band completely: its data, pictures, addresses and registration request. Irreversible.
+ *  The band record goes last, so an interrupted run can simply be started again. */
+export async function deleteBand(bandId: string) {
+  await setBandStatus(bandId, "paused"); // closes the store for fans while it is being emptied
+  for (const sub of ["sales", "items", "stock", "bundles", "members"]) await deleteAllIn(collection(db, "bands", bandId, sub));
+  for (const id of ["public", "band"]) await deleteDoc(doc(db, "bands", bandId, "settings", id));
+  await deleteStorageFolder(`bands/${bandId}`);
+  for (const col of [domainsCol(), requestsCol()]) {
+    const snap = await getDocs(query(col, where("bandId", "==", bandId)));
+    await Promise.all(snap.docs.map((d) => deleteDoc(d.ref)));
+  }
+  await deleteDoc(doc(db, "bands", bandId));
+}

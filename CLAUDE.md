@@ -46,6 +46,10 @@ email/password, Firestore, Storage), hosted on Vercel, code on GitHub. Setup ste
   re-checks (a transaction can't run the lookup, so it is checked first). The operator may query anyone's memberships
   (collection-group rule). Cannot stop someone using a second email address; the operator approval is the real gate.
 - Operator console (`/platform`): pending requests, all bands, pause/resume, add a band's own domain.
+  Also **delete a band** (`deleteBand` in `src/lib/platform.ts`; red button, type the band id to confirm): pauses it, then removes
+  sales/items/stock/bundles/members/settings, its Storage folder, its `domains` and `bandRequests` entries, then the band doc.
+  Operator only (storage.rules allows `list` on `bands/**` for the operator alone). Firebase Auth accounts of its people stay
+  (a browser can't delete users). A band's own admin cannot delete the band.
 - Create a band by script: `node scripts/create-band.mjs <bandId> "<Name>" <adminEmail> [--domain host] [--sample]`.
   Create the operator: `node scripts/create-platform-admin.mjs <email>`. A band's own custom domain also has to be added
   to the Vercel project and to Firebase Auth -> Authorized domains by hand for now (without that, the

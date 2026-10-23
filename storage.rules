@@ -22,6 +22,11 @@ service firebase.storage {
       );
     }
 
+    // Listing a band's folders (to delete a whole band) is for the BandMate operator only.
+    match /bands/{bandId}/{allPaths=**} {
+      allow list: if isPlatform();
+    }
+
     match /bands/{bandId}/{folder}/{file} {
       allow read: if true;
       allow create, update: if isStaffOf(bandId)

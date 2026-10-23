@@ -5,7 +5,7 @@ import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import { initializeTestEnvironment, assertFails, assertSucceeds } from "@firebase/rules-unit-testing";
 import { doc, getDoc, setDoc, updateDoc, getDocs, collection, collectionGroup, query, where, deleteDoc } from "firebase/firestore";
-import { ref, uploadBytes } from "firebase/storage";
+import { ref, uploadBytes, listAll } from "firebase/storage";
 
 let env;
 const ids = {
@@ -258,4 +258,34 @@ test("'which bands am I in': a person finds only their own memberships, by their
   const op = as(ids.platform, "ops@bandmate.app");
   assert.equal((await assertSucceeds(mine(op, "u-both@x.com"))).size, 2); // the operator can check anyone (is this person already in a band?)
   await assertSucceeds(getDocs(collectionGroup(op, "members")));
+});
+
+test("only the BandMate operator can wipe a band; a band's own admin cannot delete the band", async () => {
+  const admin = as(ids.adminA);
+  await assertFails(deleteDoc(doc(admin, "bands", "a"))); // not even its own admin
+  await assertFails(deleteDoc(doc(as(ids.mateA), "bands", "a")));
+  await assertFails(deleteDoc(doc(fan(), "bands", "a")));
+  const op = as(ids.platform);
+  const p = (...x) => doc(op, "bands", "b", ...x);
+  await assertSucceeds(deleteDoc(p("sales", "s1")));
+  await assertSucceeds(deleteDoc(p("items", "hat")));
+  await assertSucceeds(deleteDoc(p("stock", "hat")));
+  await assertSucceeds(deleteDoc(p("members", ids.mateB)));
+  await assertSucceeds(deleteDoc(p("members", ids.both)));
+  await assertSucceeds(deleteDoc(p("settings", "public")));
+  await assertSucceeds(deleteDoc(p("settings", "band")));
+  await assertSucceeds(deleteDoc(doc(op, "bands", "b")));
+  await assertSucceeds(deleteDoc(doc(op, "domains", "merch.band-a.com")));
+  const png = new Uint8Array([137, 80, 78, 71, 13, 10, 26, 10]);
+  await env.withSecurityRulesDisabled(async (ctx) => { await uploadBytes(ref(ctx.storage(), "bands/a/photos/x.png"), png, { contentType: "image/png" }); });
+  const { deleteObject } = await import("firebase/storage");
+  const listing = (who) => listAll(ref(authed(who).storage(), "bands/a/photos"));
+  assert.ok((await assertSucceeds(listing(ids.platform))).items.some((i) => i.name === "x.png")); // the operator can list a band's folders
+  await assertSucceeds(listAll(ref(authed(ids.platform).storage(), "bands/a"))); // and the band's top folder
+  const top = (who) => listAll(ref(who === null ? env.unauthenticatedContext().storage() : authed(who).storage(), "bands/a"));
+  await assertFails(top(ids.adminA)); // a band's own admin cannot list the whole band folder
+  await assertFails(top(ids.pendA));
+  await assertFails(top(null)); // nor can the public
+  await assertFails(deleteObject(ref(authed(ids.pendA).storage(), "bands/a/photos/x.png"))); // not staff
+  await assertSucceeds(deleteObject(ref(authed(ids.platform).storage(), "bands/a/photos/x.png"))); // operator may remove pictures
 });

@@ -436,4 +436,12 @@ export const sk: Record<Key, string> = {
   "start.openBand": "Otvoriť moju kapelu",
   "con.alreadyMember": "Už je v kapele: {list}",
   "con.errAlreadyMember": "{email} už patrí do kapely „{band}“. Jeden e-mail môže zaregistrovať len jednu kapelu, takže túto žiadosť odmietni.",
+  "con.delete": "Zmazať kapelu",
+  "con.deleteTitle": "Zmazať „{name}“ navždy?",
+  "con.deleteWarn": "Zmaže produkty, sklad, predaje, tím, fotky aj adresy kapely. Nedá sa to vrátiť. Prihlasovacie účty ľudí zostanú, ale z tejto kapely odídu.",
+  "con.deleteType": "Na potvrdenie napíš {id}",
+  "con.deleteGo": "Zmazať navždy",
+  "con.deleting": "Mažem…",
+  "con.deleted": "Kapela {name} zmazaná",
+  "con.deleteFailed": "Mazanie sa nepodarilo dokončiť. Skús znova; čo je zmazané, zostane zmazané.",
 };
