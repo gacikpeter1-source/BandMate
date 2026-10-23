@@ -429,6 +429,11 @@ export const en = {
   "terms.dataT": "We store your band's data (products, stock, sales, team members' names and email addresses) to run the service. Your band's data is separated from other bands' data.",
   "terms.endH": "Availability, changes and ending",
   "terms.endT": "We aim to keep the service running but cannot promise it will never be interrupted. Pricing and these terms may change with notice. Either side may end the service; we can pause a band page that breaks these terms.",
+  "start.alreadyTitle": "You already have a band",
+  "start.alreadyText": "{email} already belongs to “{name}”. One email can register only one band.",
+  "start.openBand": "Open my band",
+  "con.alreadyMember": "Already in: {list}",
+  "con.errAlreadyMember": "{email} already belongs to “{band}”. One email can register only one band, so reject this request.",
 } as const;
 
 export type Key = keyof typeof en;

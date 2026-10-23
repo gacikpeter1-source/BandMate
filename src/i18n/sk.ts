@@ -431,4 +431,9 @@ export const sk: Record<Key, string> = {
   "terms.dataT": "Údaje tvojej kapely (produkty, sklad, predaje, mená a e-mailové adresy členov tímu) ukladáme, aby sme mohli službu prevádzkovať. Údaje tvojej kapely sú oddelené od údajov iných kapiel.",
   "terms.endH": "Dostupnosť, zmeny a ukončenie",
   "terms.endT": "Snažíme sa službu udržať v prevádzke, ale nemôžeme sľúbiť, že nebude nikdy prerušená. Cena a tieto podmienky sa môžu zmeniť s oznámením. Ktorákoľvek strana môže službu ukončiť; stránku kapely, ktorá porušuje tieto podmienky, môžeme pozastaviť.",
+  "start.alreadyTitle": "Už máš kapelu",
+  "start.alreadyText": "{email} už patrí do kapely „{name}“. Jeden e-mail môže zaregistrovať len jednu kapelu.",
+  "start.openBand": "Otvoriť moju kapelu",
+  "con.alreadyMember": "Už je v kapele: {list}",
+  "con.errAlreadyMember": "{email} už patrí do kapely „{band}“. Jeden e-mail môže zaregistrovať len jednu kapelu, takže túto žiadosť odmietni.",
 };

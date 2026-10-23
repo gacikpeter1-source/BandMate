@@ -1,9 +1,10 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import { signOut } from "firebase/auth";
 import { query, where } from "firebase/firestore";
 import { auth } from "../../firebase";
 import { PLATFORM_HOST } from "../../lib/host";
+import { activeBands, fetchMyBands, type MyBand } from "../../lib/memberships";
 import { addBandDomain, approveBandRequest, bandsCol, domainsCol, rejectBandRequest, requestsCol, setBandStatus } from "../../lib/platform";
 import { useLiveQuery } from "../../lib/live";
 import { errorText } from "../../lib/format";
@@ -28,6 +29,17 @@ export default function PlatformConsole() {
   const requests = useLiveQuery<BandRequest>(() => (isPlatform ? query(requestsCol(), where("status", "==", "pending")) : null), `platform-requests-${isPlatform}`);
   const [newDomain, setNewDomain] = useState<Record<string, string>>({});
   const [busy, setBusy] = useState("");
+  // Is the person behind each pending request already working in a band? (one email, one band)
+  const [inBands, setInBands] = useState<Record<string, MyBand[]>>({});
+  const emailsKey = requests.data.map((r) => r.email).join("|");
+  useEffect(() => {
+    if (!isPlatform) return;
+    requests.data.forEach((r) => {
+      fetchMyBands(r.email)
+        .then((b) => setInBands((m) => ({ ...m, [r.email]: activeBands(b).filter((x) => x.bandId !== r.bandId) })))
+        .catch(() => {});
+    });
+  }, [emailsKey, isPlatform]); // eslint-disable-line react-hooks/exhaustive-deps
 
   if (!ready) return <main className="page"><div className="wrap"><Loading /></div></main>;
   if (!user) return <main className="page"><div className="wrap"><Link to="/platform/login">{t("con.signInLink")}</Link></div></main>;
@@ -66,8 +78,11 @@ export default function PlatformConsole() {
               <p className="note">{t("con.address", { addr: `${r.bandId}.${PLATFORM_HOST}` })}</p>
               {r.domain && <p className="note">{t("con.ownDomain", { d: r.domain })}</p>}
               <p className="note">{t("con.byline", { name: r.displayName, email: r.email, v: r.termsVersion })}</p>
+              {(inBands[r.email] || []).length > 0 && (
+                <p className="hint err">{t("con.alreadyMember", { list: inBands[r.email].map((b) => `${b.name} (${b.role})`).join(", ") })}</p>
+              )}
               <div className="stack-sm">
-                <button className="btn primary" disabled={busy === r.id} onClick={() => run(r.id, approveBandRequest(r), t("con.approved", { name: r.bandName }))}>{t("con.approve")}</button>
+                <button className="btn primary" disabled={busy === r.id || (inBands[r.email] || []).length > 0} onClick={() => run(r.id, approveBandRequest(r), t("con.approved", { name: r.bandName }))}>{t("con.approve")}</button>
                 <button className="btn ghost" disabled={busy === r.id} onClick={() => run(r.id, rejectBandRequest(r.id), t("con.rejected"))}>{t("con.reject")}</button>
               </div>
             </section>

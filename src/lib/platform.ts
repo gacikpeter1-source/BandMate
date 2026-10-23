@@ -4,6 +4,7 @@ import { db } from "../firebase";
 import { RESERVED_BAND_IDS } from "./host";
 import { tr } from "../i18n";
 import { DEFAULT_SETTINGS } from "../state/settings";
+import { activeBands, fetchMyBands } from "./memberships";
 import type { BandRequest } from "../types";
 
 export const bandsCol = () => collection(db, "bands");
@@ -58,7 +59,10 @@ export const cancelBandRequest = (uid: string) => deleteDoc(requestDoc(uid));
 
 /** Creates the band, its default settings, its first admin and (if asked for) its own domain, in one
  *  all-or-nothing step, and marks the request approved. Fails if the address got taken meanwhile. */
-export function approveBandRequest(r: BandRequest) {
+export async function approveBandRequest(r: BandRequest) {
+  // One email, one band. (A transaction can't run this lookup, so it is checked first.)
+  const already = activeBands(await fetchMyBands(r.email)).find((b) => b.bandId !== r.bandId);
+  if (already) throw new Error(tr("con.errAlreadyMember", { email: r.email, band: already.name }));
   return runTransaction(db, async (tx) => {
     const bandRef = doc(db, "bands", r.bandId);
     if ((await tx.get(bandRef)).exists()) throw new Error(tr("con.errTaken", { id: r.bandId }));

@@ -4,6 +4,7 @@ import { auth } from "../../firebase";
 import { Link } from "../../lib/nav";
 import { PLATFORM_HOST, bandUrl } from "../../lib/host";
 import { useLiveDoc } from "../../lib/live";
+import { activeBands, fetchMyBands, type MyBand } from "../../lib/memberships";
 import { cancelBandRequest, fileBandRequest, isBandIdTaken, requestDoc, slugFormatProblem, slugify, type SlugProblem } from "../../lib/platform";
 import { useAuth } from "../../state/auth";
 import { useT, type Key } from "../../i18n";
@@ -44,9 +45,37 @@ export default function StartPage() {
 
 function Founder({ user }: { user: User }) {
   const req = useLiveDoc<BandRequest>(() => requestDoc(user.uid), `request-${user.uid}`);
-  if (!req.ready) return <main className="page"><div className="wrap"><Loading /></div></main>;
+  // One email, one band: someone who already works in a band can't register another.
+  // If the lookup fails we let them through; the operator checks again before approving.
+  const [mine, setMine] = useState<MyBand[] | "failed" | null>(null);
+  useEffect(() => {
+    let stale = false;
+    fetchMyBands(user.email || "")
+      .then((b) => !stale && setMine(b))
+      .catch(() => !stale && setMine("failed"));
+    return () => {
+      stale = true;
+    };
+  }, [user.email]);
+  if (!req.ready || !mine) return <main className="page"><div className="wrap"><Loading /></div></main>;
   if (req.data) return <Status req={req.data} uid={user.uid} />;
+  const already = mine === "failed" ? undefined : activeBands(mine)[0];
+  if (already) return <AlreadyInBand email={user.email || ""} band={already} />;
   return <RequestForm user={user} />;
+}
+
+function AlreadyInBand({ email, band }: { email: string; band: MyBand }) {
+  const t = useT();
+  return card(
+    <>
+      <h1>{t("start.alreadyTitle")}</h1>
+      <p className="note">{t("start.alreadyText", { email, name: band.name })}</p>
+      <div className="stack-sm">
+        <Link className="btn primary block" to={`/b/${band.bandId}/band`}>{t("start.openBand")}</Link>
+        <button className="btn ghost block" onClick={() => signOut(auth)}>{t("common.signOut")}</button>
+      </div>
+    </>
+  );
 }
 
 const PROBLEM: Record<Exclude<SlugProblem, null>, Key> = {

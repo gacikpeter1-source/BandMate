@@ -38,10 +38,11 @@ service cloud.firestore {
       allow list, write: if platformAdmin();
     }
 
-    // "Which bands am I in?": one collection-group query by the signed-in person's own email.
-    // Only returns member documents carrying their own verified email.
+    // "Which bands am I in?": one collection-group query by the signed-in person's own email, which
+    // only returns member documents carrying their own verified email. The BandMate operator may look up
+    // anyone's, to see that a person asking for a new band already belongs to one.
     match /{path=**}/members/{memberId} {
-      allow read: if verified() && resource.data.email == request.auth.token.email;
+      allow read: if verified() && (resource.data.email == request.auth.token.email || platformAdmin());
     }
 
     // A founder's request for a new band space: one per verified account (doc id = their uid).

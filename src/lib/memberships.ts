@@ -23,3 +23,6 @@ export async function fetchMyBands(email: string): Promise<MyBand[]> {
   );
   return rows.filter((r) => r.role !== "disabled").sort((a, b) => a.name.localeCompare(b.name));
 }
+
+/** Bands where this email is already a working member (admin or band mate). Waiting/blocked do not count. */
+export const activeBands = (bands: MyBand[]) => bands.filter((b) => b.role === "admin" || b.role === "bandmate");

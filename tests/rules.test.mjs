@@ -255,5 +255,7 @@ test("'which bands am I in': a person finds only their own memberships, by their
   await assertFails(mine(fan(), "u-both@x.com")); // not signed in
   await assertFails(getDocs(collectionGroup(me, "members"))); // no unfiltered listing
   await assertFails(getDocs(collectionGroup(as(ids.adminA, "u-admin-a@x.com"), "members"))); // not even a band admin
-  await assertFails(getDocs(collectionGroup(as(ids.platform, "ops@bandmate.app"), "members"))); // even the operator uses the per-band lists, not this lookup
+  const op = as(ids.platform, "ops@bandmate.app");
+  assert.equal((await assertSucceeds(mine(op, "u-both@x.com"))).size, 2); // the operator can check anyone (is this person already in a band?)
+  await assertSucceeds(getDocs(collectionGroup(op, "members")));
 });

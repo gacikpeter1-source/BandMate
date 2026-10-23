@@ -40,6 +40,11 @@ email/password, Firestore, Storage), hosted on Vercel, code on GitHub. Setup ste
   optional `domains` entry) or rejects it. The founder sees the result at `/start` and signs in again at the band's own
   address (sign-in is per address). Terms text is a PLACEHOLDER (`TermsPage.tsx`); bump `TERMS_VERSION` when it changes.
   Payment is not part of this yet: approval is the gate until Stripe exists.
+  **One email, one band**: Firebase Auth allows one account per email (case-insensitive); doc id = uid allows one request per
+  account (an approved one can't be deleted/refiled); `/start` shows "You already have a band" to anyone who is admin or
+  bandmate in a band (`activeBands`); the console flags such a request and disables Approve, and `approveBandRequest`
+  re-checks (a transaction can't run the lookup, so it is checked first). The operator may query anyone's memberships
+  (collection-group rule). Cannot stop someone using a second email address; the operator approval is the real gate.
 - Operator console (`/platform`): pending requests, all bands, pause/resume, add a band's own domain.
 - Create a band by script: `node scripts/create-band.mjs <bandId> "<Name>" <adminEmail> [--domain host] [--sample]`.
   Create the operator: `node scripts/create-platform-admin.mjs <email>`. A band's own custom domain also has to be added
