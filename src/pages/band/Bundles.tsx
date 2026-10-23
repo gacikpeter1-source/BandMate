@@ -6,22 +6,24 @@ import { useSettings } from "../../state/settings";
 import { useToast } from "../../state/toast";
 import { errorText, groupItems, money } from "../../lib/format";
 import { removeImage } from "../../lib/images";
+import { useT } from "../../i18n";
 import { ConfirmButton, Icon, ImageField, PhotosField, Sheet, Toggle } from "../../components/ui";
 import type { Bundle, BundlePart, Photo } from "../../types";
 
 export default function Bundles() {
+  const t = useT();
   const { bundles, items } = useBand();
   const { settings } = useSettings();
   const [edit, setEdit] = useState<Bundle | "new" | null>(null);
   return (
     <>
       <div className="toolbar">
-        <button className="btn primary" disabled={!items.length} onClick={() => setEdit("new")}>+ New bundle</button>
+        <button className="btn primary" disabled={!items.length} onClick={() => setEdit("new")}>{t("bundles.new")}</button>
       </div>
       {!bundles.length ? (
         <div className="empty">
-          <h3>No bundles yet</h3>
-          <p>A bundle sells several things for one price, like a shirt and a hat for less. The size is picked when you sell it.</p>
+          <h3>{t("bundles.emptyTitle")}</h3>
+          <p>{t("bundles.emptyText")}</p>
         </div>
       ) : (
         <div className="grid">
@@ -36,10 +38,10 @@ export default function Bundles() {
               </div>
               <div className="meta-row">
                 {b.qrUrl ? <img className="mini-qr" src={b.qrUrl} alt="" /> : null}
-                <span className="note">{b.qrUrl ? "Payment QR attached" : "No payment QR"}</span>
-                {!b.visible && <span className="hidden-tag">{Icon.eyeOff} hidden from fans</span>}
+                <span className="note">{b.qrUrl ? t("bundles.qrAttached") : t("bundles.noQr")}</span>
+                {!b.visible && <span className="hidden-tag">{Icon.eyeOff} {t("bundles.hiddenFromFans")}</span>}
               </div>
-              <button className="btn ghost block" onClick={() => setEdit(b)}>Edit bundle</button>
+              <button className="btn ghost block" onClick={() => setEdit(b)}>{t("bundles.edit")}</button>
             </article>
           ))}
         </div>
@@ -50,6 +52,7 @@ export default function Bundles() {
 }
 
 function BundleSheet({ bundle, onClose }: { bundle: Bundle | null; onClose: () => void }) {
+  const t = useT();
   const { items, bundles } = useBand();
   const { settings } = useSettings();
   const toast = useToast();
@@ -66,7 +69,7 @@ function BundleSheet({ bundle, onClose }: { bundle: Bundle | null; onClose: () =
   const submit = (e: FormEvent) => {
     e.preventDefault();
     const clean = parts.filter((p) => p.name).map((p) => ({ name: p.name, qty: Math.max(1, p.qty || 1) }));
-    if (!clean.length) return toast("Add at least one item to the bundle.");
+    if (!clean.length) return toast(t("bundles.needItem"));
     const ref = bundle ? bandDoc("bundles", bundle.id) : doc(bandCol("bundles"));
     setDoc(ref, {
       name: name.trim(),
@@ -80,49 +83,49 @@ function BundleSheet({ bundle, onClose }: { bundle: Bundle | null; onClose: () =
     }).catch((x) => toast(errorText(x)));
     const keep = new Set(photos.map((x) => x.path));
     (bundle?.images ?? []).filter((x) => !keep.has(x.path)).forEach((x) => removeImage(x.path));
-    toast("Bundle saved");
+    toast(t("bundles.saved"));
     onClose();
   };
 
   return (
-    <Sheet title={bundle ? "Edit bundle" : "New bundle"} onClose={onClose}>
+    <Sheet title={bundle ? t("bundles.edit") : t("bundles.newTitle")} onClose={onClose}>
       <form className="stack" onSubmit={submit}>
         <div className="field">
-          <label htmlFor="bName">Bundle name</label>
-          <input id="bName" required value={name} onChange={(e) => setName(e.target.value)} placeholder="Shirt + Hat" />
+          <label htmlFor="bName">{t("bundles.name")}</label>
+          <input id="bName" required value={name} onChange={(e) => setName(e.target.value)} placeholder={t("bundles.namePh")} />
         </div>
         <div className="field">
-          <label htmlFor="bPrice">Bundle price ({settings.currency})</label>
+          <label htmlFor="bPrice">{t("bundles.price", { cur: settings.currency })}</label>
           <input id="bPrice" type="number" inputMode="decimal" min="0" step="0.01" required value={price} onChange={(e) => setPrice(e.target.value)} />
         </div>
         <div className="field">
-          <span className="label">What's inside</span>
+          <span className="label">{t("bundles.inside")}</span>
           {parts.map((p, i) => (
             <div className="part" key={i}>
-              <select value={p.name} onChange={(e) => setPart(i, { name: e.target.value })} aria-label={`Item ${i + 1}`}>
+              <select value={p.name} onChange={(e) => setPart(i, { name: e.target.value })} aria-label={t("bundles.itemAria", { n: i + 1 })}>
                 {names.map((n) => <option key={n}>{n}</option>)}
               </select>
-              <input type="number" min="1" step="1" inputMode="numeric" value={p.qty} onChange={(e) => setPart(i, { qty: parseInt(e.target.value) || 1 })} aria-label="Quantity" />
-              <button type="button" className="icon-btn" disabled={parts.length < 2} onClick={() => setParts((ps) => ps.filter((_, j) => j !== i))} aria-label="Remove">{Icon.x}</button>
+              <input type="number" min="1" step="1" inputMode="numeric" value={p.qty} onChange={(e) => setPart(i, { qty: parseInt(e.target.value) || 1 })} aria-label={t("bundles.qty")} />
+              <button type="button" className="icon-btn" disabled={parts.length < 2} onClick={() => setParts((ps) => ps.filter((_, j) => j !== i))} aria-label={t("common.remove")}>{Icon.x}</button>
             </div>
           ))}
-          <button type="button" className="btn ghost sm" onClick={() => setParts((ps) => [...ps, { name: names[0] || "", qty: 1 }])}>+ Add another item</button>
-          <span className="hint">Pick the item, not the size. The seller chooses the size when selling.</span>
+          <button type="button" className="btn ghost sm" onClick={() => setParts((ps) => [...ps, { name: names[0] || "", qty: 1 }])}>{t("bundles.addAnother")}</button>
+          <span className="hint">{t("bundles.insideHint")}</span>
         </div>
-        <PhotosField label="Photos" photos={photos} onChange={setPhotos} hint="Fans scroll through these on the shop page. The first photo is the main one." />
-        <ImageField label="Payment QR picture" folder="qr" url={qr?.url ?? null} onChange={setQr} />
-        <Toggle id="bVisible" checked={visible} onChange={setVisible} label="Show on the fan page" />
-        <button className="btn primary block">{bundle ? "Save bundle" : "Create bundle"}</button>
+        <PhotosField label={t("item.photos")} photos={photos} onChange={setPhotos} hint={t("bundles.photosHint")} />
+        <ImageField label={t("item.qr")} folder="qr" url={qr?.url ?? null} onChange={setQr} />
+        <Toggle id="bVisible" checked={visible} onChange={setVisible} label={t("item.visible")} />
+        <button className="btn primary block">{bundle ? t("bundles.save") : t("bundles.create")}</button>
         {bundle && (
           <ConfirmButton
-            confirmText="Tap again to delete"
+            confirmText={t("item.confirmDelete")}
             onConfirm={() => {
               deleteDoc(bandDoc("bundles", bundle.id)).catch((x) => toast(errorText(x)));
-              toast("Bundle deleted");
+              toast(t("bundles.deleted"));
               onClose();
             }}
           >
-            Delete bundle
+            {t("bundles.delete")}
           </ConfirmButton>
         )}
       </form>

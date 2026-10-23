@@ -7,6 +7,7 @@ import { useToast } from "../../state/toast";
 import { gkey, groupItems, itemLabel, money, newKey, priceTag, sizeRank } from "../../lib/format";
 import { recordSale, setSaleUndone } from "../../lib/ops";
 import { errorText } from "../../lib/format";
+import { useT } from "../../i18n";
 import { Icon, QrFull, Sheet } from "../../components/ui";
 import type { BasketLine, Bundle, Item, Method } from "../../types";
 
@@ -17,6 +18,7 @@ export function basketMap(basket: BasketLine[]) {
 }
 
 export default function Sell() {
+  const t = useT();
   const { items, stock, bundles, basket, setBasket } = useBand();
   const { settings } = useSettings();
   const cur = settings.currency;
@@ -41,9 +43,9 @@ export default function Sell() {
   if (!groups.length && !bundles.length)
     return (
       <div className="empty">
-        <h3>Your merch box is empty</h3>
-        <p>Add what you brought to the gig: each shirt size, hats, cups. Then attach a payment QR picture to each one.</p>
-        <Link className="btn primary" to="/band/stock">Add stock</Link>
+        <h3>{t("sell.emptyTitle")}</h3>
+        <p>{t("sell.emptyText")}</p>
+        <Link className="btn primary" to="/band/stock">{t("sell.addStock")}</Link>
       </div>
     );
 
@@ -52,7 +54,7 @@ export default function Sell() {
 
   return (
     <>
-      <h2 className="sec">Tap a size to add it to the basket</h2>
+      <h2 className="sec">{t("sell.tapSize")}</h2>
       <div className="grid">
         {groups.map((g) => {
           const single = g.items.length === 1 && !g.items[0].variant;
@@ -64,22 +66,22 @@ export default function Sell() {
                   {g.items.find((i) => i.images?.length)?.images?.[0] && <img className="thumb" src={g.items.find((i) => i.images?.length)!.images![0].url} alt="" />}
                   <div>
                     <h3>{g.name}</h3>
-                    <div className="sub num">{left} in stock</div>
+                    <div className="sub num">{t("sell.inStock", { n: left })}</div>
                   </div>
                 </div>
                 <span className="tag">{priceTag(g.items, cur)}</span>
               </div>
               {single ? (
                 <button className={`btn block ${avail(g.items[0].id) > 0 ? "primary" : ""}`} disabled={avail(g.items[0].id) <= 0} onClick={() => add(g.items[0])}>
-                  {avail(g.items[0].id) > 0 ? "Add to basket" : (stock[g.items[0].id] ?? 0) > 0 ? "All in basket" : "Sold out"}
+                  {avail(g.items[0].id) > 0 ? t("sell.addToBasket") : (stock[g.items[0].id] ?? 0) > 0 ? t("sell.allInBasket") : t("sell.soldOut")}
                   {inBasket[g.items[0].id] ? <span className="num"> ({inBasket[g.items[0].id]})</span> : null}
                 </button>
               ) : (
                 <div className="sizes">
                   {g.items.map((it) => (
-                    <button key={it.id} className="chip" disabled={avail(it.id) <= 0} onClick={() => add(it)} aria-label={`Add ${itemLabel(it)}, ${Math.max(0, stock[it.id] ?? 0)} left`}>
-                      <b>{it.variant || "One size"}</b>
-                      <small className="num">{Math.max(0, stock[it.id] ?? 0)} left</small>
+                    <button key={it.id} className="chip" disabled={avail(it.id) <= 0} onClick={() => add(it)} aria-label={t("sell.chipAria", { label: itemLabel(it), n: Math.max(0, stock[it.id] ?? 0) })}>
+                      <b>{it.variant || t("common.oneSize")}</b>
+                      <small className="num">{t("sell.left", { n: Math.max(0, stock[it.id] ?? 0) })}</small>
                       {inBasket[it.id] ? <span className="badge num">{inBasket[it.id]}</span> : null}
                     </button>
                   ))}
@@ -91,7 +93,7 @@ export default function Sell() {
       </div>
       {bundles.length > 0 && (
         <>
-          <h2 className="sec">Bundles</h2>
+          <h2 className="sec">{t("sell.bundles")}</h2>
           <div className="grid">
             {bundles.map((b) => {
               const ok = bundleOk(b);
@@ -109,7 +111,7 @@ export default function Sell() {
                     <span className="tag">{money(b.price, cur)}</span>
                   </div>
                   <button className={`btn block ${ok ? "primary" : ""}`} disabled={!ok} onClick={() => setPicker(b)}>
-                    {ok ? (choose ? "Choose sizes" : "Add bundle") : "Not enough stock"}
+                    {ok ? (choose ? t("sell.chooseSizes") : t("sell.addBundle")) : t("sell.notEnough")}
                   </button>
                 </article>
               );
@@ -120,9 +122,9 @@ export default function Sell() {
       {basket.length > 0 && (
         <div className="basket">
           <button className="basket-in" onClick={() => setCheckout(true)}>
-            <span className="cnt num">{count} in basket</span>
+            <span className="cnt num">{t("sell.inBasket", { n: count })}</span>
             <span className="tot num">{money(total, cur)}</span>
-            <span className="go">Checkout</span>
+            <span className="go">{t("sell.checkout")}</span>
           </button>
         </div>
       )}
@@ -133,6 +135,7 @@ export default function Sell() {
 }
 
 function BundlePicker({ bundle, avail, onClose }: { bundle: Bundle; avail: (id: string, extra?: number) => number; onClose: () => void }) {
+  const t = useT();
   const { items, setBasket } = useBand();
   const { settings } = useSettings();
   const slots = useMemo(() => {
@@ -174,28 +177,27 @@ function BundlePicker({ bundle, avail, onClose }: { bundle: Bundle; avail: (id: 
   return (
     <Sheet title={bundle.name} onClose={onClose}>
       {slots.map((s, i) => {
-        if (!s.options.length) return <p key={i} className="hint err">No “{s.name}” in stock list.</p>;
+        if (!s.options.length) return <p key={i} className="hint err">{t("sell.noSuch", { name: s.name })}</p>;
         if (s.options.length === 1)
           return (
             <div className="pick" key={i}>
               <h4>{s.name}</h4>
-              <span className="note">{itemLabel(s.options[0])} · included</span>
+              <span className="note">{t("sell.included", { label: itemLabel(s.options[0]) })}</span>
             </div>
           );
         const used = usedExcept(i);
         return (
           <div className="pick" key={i}>
             <h4>
-              {s.name}
-              {s.of > 1 ? ` ${s.n} of ${s.of}` : ""}
+              {s.of > 1 ? t("sell.nOfM", { name: s.name, n: s.n, of: s.of }) : s.name}
             </h4>
             <div className="sizes">
               {s.options.map((it) => {
                 const a = avail(it.id, used[it.id] || 0);
                 return (
                   <button key={it.id} className={`chip ${picked[i] === it.id ? "sel" : ""}`} disabled={a <= 0 && picked[i] !== it.id} onClick={() => setPicked((p) => p.map((v, j) => (j === i ? it.id : v)))}>
-                    <b>{it.variant || "One size"}</b>
-                    <small className="num">{Math.max(0, a)} left</small>
+                    <b>{it.variant || t("common.oneSize")}</b>
+                    <small className="num">{t("sell.left", { n: Math.max(0, a) })}</small>
                   </button>
                 );
               })}
@@ -204,13 +206,14 @@ function BundlePicker({ bundle, avail, onClose }: { bundle: Bundle; avail: (id: 
         );
       })}
       <button className="btn primary block" disabled={!ok} onClick={addBundle}>
-        Add bundle · {money(bundle.price, settings.currency)}
+        {t("sell.addBundleBtn", { price: money(bundle.price, settings.currency) })}
       </button>
     </Sheet>
   );
 }
 
 function Checkout({ onClose, avail }: { onClose: () => void; avail: (id: string) => number }) {
+  const t = useT();
   const { basket, setBasket, stock, items, band } = useBand();
   const { settings } = useSettings();
   const { profile } = useAuth();
@@ -235,10 +238,10 @@ function Checkout({ onClose, avail }: { onClose: () => void; avail: (id: string)
   const confirm = () => {
     const { id, total, saved } = recordSale({ lines: basket, method, gig: band.gig, by: profile!.id, byName: profile!.displayName || profile!.email, stock });
     const lines = basket.map((l) => ({ ...l }));
-    saved.catch((e) => toast(`Sale not saved: ${errorText(e)}`));
+    saved.catch((e) => toast(t("sell.saleNotSaved", { err: errorText(e) })));
     setBasket(() => []);
     onClose();
-    toast(`Sold · ${money(total, cur)}`, () => {
+    toast(t("sell.sold", { price: money(total, cur) }), () => {
       setSaleUndone({ id, lines }, true, stock, items).catch((e) => toast(errorText(e)));
     });
   };
@@ -249,46 +252,46 @@ function Checkout({ onClose, avail }: { onClose: () => void; avail: (id: string)
   }
 
   return (
-    <Sheet title="Checkout" onClose={onClose}>
+    <Sheet title={t("sell.checkoutTitle")} onClose={onClose}>
       <div>
         {basket.map((l) => (
           <div className="line" key={l.key}>
             <div className="nm">
               <b>{l.label}</b>
               {l.detail && <small>{l.detail}</small>}
-              <small className="num">{money(l.price, cur)} each</small>
+              <small className="num">{t("sell.each", { price: money(l.price, cur) })}</small>
             </div>
             {l.kind === "item" ? (
               <div className="stepper">
-                <button onClick={() => change(l.key, -1)} aria-label="One less">−</button>
+                <button onClick={() => change(l.key, -1)} aria-label={t("sell.oneLess")}>−</button>
                 <span className="num">{l.qty}</span>
-                <button onClick={() => change(l.key, 1)} disabled={avail(l.refId) <= 0} aria-label="One more">+</button>
+                <button onClick={() => change(l.key, 1)} disabled={avail(l.refId) <= 0} aria-label={t("sell.oneMore")}>+</button>
               </div>
             ) : (
               <span />
             )}
-            <button className="icon-btn" onClick={() => setBasket((b) => b.filter((x) => x.key !== l.key))} aria-label={`Remove ${l.label}`}>
+            <button className="icon-btn" onClick={() => setBasket((b) => b.filter((x) => x.key !== l.key))} aria-label={t("sell.removeAria", { label: l.label })}>
               {Icon.x}
             </button>
           </div>
         ))}
       </div>
       <div className="grand">
-        <span>Total</span>
+        <span>{t("sell.total")}</span>
         <b className="num">{money(total, cur)}</b>
       </div>
-      <div className="seg" role="group" aria-label="Payment method">
+      <div className="seg" role="group" aria-label={t("sell.payMethod")}>
         {(["qr", "cash", "card"] as Method[]).map((m) => (
           <button key={m} aria-pressed={method === m} onClick={() => setMethod(m)}>
-            {m === "qr" ? "QR" : m === "cash" ? "Cash" : "Card"}
+            {t(m === "qr" ? "pay.qr" : m === "cash" ? "pay.cash" : "pay.card")}
           </button>
         ))}
       </div>
       {method === "qr" &&
         (q ? (
           <div className="payqr">
-            <button className="plain" onClick={() => setFull(true)} aria-label="Show QR full screen">
-              <img src={q.src} alt={`Payment QR for ${q.title}`} />
+            <button className="plain" onClick={() => setFull(true)} aria-label={t("sell.qrFullAria")}>
+              <img src={q.src} alt={t("qr.alt", { title: q.title })} />
             </button>
             <div className="cap">
               {q.title}
@@ -296,20 +299,20 @@ function Checkout({ onClose, avail }: { onClose: () => void; avail: (id: string)
             </div>
             {qrs.length > 1 && (
               <div className="qrnav">
-                <button onClick={() => setIdx((idx - 1 + qrs.length) % qrs.length)}>‹ Prev</button>
-                <span className="num">QR {Math.min(idx, qrs.length - 1) + 1} of {qrs.length}</span>
-                <button onClick={() => setIdx((idx + 1) % qrs.length)}>Next ›</button>
+                <button onClick={() => setIdx((idx - 1 + qrs.length) % qrs.length)}>{t("sell.prev")}</button>
+                <span className="num">{t("sell.qrNav", { i: Math.min(idx, qrs.length - 1) + 1, n: qrs.length })}</span>
+                <button onClick={() => setIdx((idx + 1) % qrs.length)}>{t("sell.next")}</button>
               </div>
             )}
           </div>
         ) : (
-          <div className="noqr">None of these items has a QR picture yet. Add one in Stock, or take cash or card.</div>
+          <div className="noqr">{t("sell.noQr")}</div>
         ))}
       <p className="note">
-        {method === "qr" ? "Tap the code to show it full screen. When the fan shows you the payment confirmation, mark it paid." : method === "cash" ? "Take the cash, then mark it paid." : "Run the card on your terminal, then mark it paid."}
+        {method === "qr" ? t("sell.noteQr") : method === "cash" ? t("sell.noteCash") : t("sell.noteCard")}
       </p>
-      <button className="btn primary block" onClick={confirm}>Payment received · mark sold</button>
-      <button className="btn ghost block" onClick={() => { setBasket(() => []); onClose(); }}>Empty basket</button>
+      <button className="btn primary block" onClick={confirm}>{t("sell.markSold")}</button>
+      <button className="btn ghost block" onClick={() => { setBasket(() => []); onClose(); }}>{t("sell.emptyBasket")}</button>
       {full && q && <QrFull src={q.src} title={q.title} sub={q.sub} onClose={() => setFull(false)} />}
     </Sheet>
   );

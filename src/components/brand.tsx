@@ -2,17 +2,12 @@ import { useEffect, useState } from "react";
 import QRCode from "qrcode";
 import type { PublicSettings, SocialLink } from "../types";
 import { QrFull } from "./ui";
+import { tr, useT } from "../i18n";
 
-export const SOCIAL_TYPES: Record<string, string> = {
-  instagram: "Instagram",
-  facebook: "Facebook",
-  tiktok: "TikTok",
-  youtube: "YouTube",
-  spotify: "Spotify",
-  bandcamp: "Bandcamp",
-  website: "Website",
-  other: "Link",
-};
+export const SOCIAL_TYPE_IDS = ["instagram", "facebook", "tiktok", "youtube", "spotify", "bandcamp", "website", "other"];
+const BRANDS: Record<string, string> = { instagram: "Instagram", facebook: "Facebook", tiktok: "TikTok", youtube: "YouTube", spotify: "Spotify", bandcamp: "Bandcamp" };
+/** Network names stay as they are; only "Website" / "Link" are translated. */
+export const socialLabel = (type: string) => BRANDS[type] || (type === "website" ? tr("social.website") : tr("social.other"));
 
 export function normaliseUrl(u: string) {
   const t = u.trim();
@@ -44,19 +39,20 @@ function SocialQr({ link, onOpen }: { link: SocialLink & { label: string; text: 
 
 /** The optional strip of social-media QR codes and email on the fan screen. */
 export function TopBar({ settings }: { settings: PublicSettings }) {
+  const t = useT();
   const [open, setOpen] = useState<{ src: string; title: string; sub: string } | null>(null);
   const tb = settings.topBar;
   if (!tb.enabled) return null;
   const links = tb.links
     .filter((l) => l.url.trim())
-    .map((l) => ({ ...l, label: SOCIAL_TYPES[l.type] || "Link", text: normaliseUrl(l.url) }));
-  if (tb.email.trim()) links.push({ type: "email", url: tb.email.trim(), label: "Email", text: `mailto:${tb.email.trim()}` });
+    .map((l) => ({ ...l, label: socialLabel(l.type), text: normaliseUrl(l.url) }));
+  if (tb.email.trim()) links.push({ type: "email", url: tb.email.trim(), label: t("social.email"), text: `mailto:${tb.email.trim()}` });
   if (!links.length) return null;
   return (
     <>
       <div className="topbar">
         <div className="topbar-in">
-          <span className="topbar-lbl">Follow us</span>
+          <span className="topbar-lbl">{t("topbar.follow")}</span>
           <div className="topbar-row">
             {links.map((l, i) => (
               <SocialQr key={i} link={l} onOpen={(src, title, sub) => setOpen({ src, title, sub })} />

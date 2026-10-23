@@ -6,12 +6,14 @@ import { useToast } from "../../state/toast";
 import { errorText, groupItems, itemLabel, money } from "../../lib/format";
 import { addStock, createItems, deleteItem, recordSale, setStockCount, updateItem } from "../../lib/ops";
 import { removeImage } from "../../lib/images";
+import { useT } from "../../i18n";
 import { ConfirmButton, Icon, ImageField, PhotosField, QrFull, Sheet, Toggle } from "../../components/ui";
 import type { Item, Photo } from "../../types";
 
 const pill = (n: number) => (n < 0 ? "out" : n === 0 ? "out" : n <= 3 ? "low" : "ok");
 
 export default function Stock() {
+  const t = useT();
   const { items, stock, band } = useBand();
   const { settings } = useSettings();
   const { profile } = useAuth();
@@ -32,52 +34,52 @@ export default function Stock() {
       byName: profile!.displayName || profile!.email,
       stock,
     });
-    saved.catch((e) => toast(`Sale not saved: ${errorText(e)}`));
-    toast(`Sold 1 × ${itemLabel(it)}. Undo it in Sales.`);
+    saved.catch((e) => toast(t("sell.saleNotSaved", { err: errorText(e) })));
+    toast(t("stock.soldOne", { label: itemLabel(it) }));
   };
 
   return (
     <>
       <div className="toolbar">
-        <button className="btn primary" onClick={() => setEdit("new")}>+ Add item</button>
+        <button className="btn primary" onClick={() => setEdit("new")}>{t("stock.add")}</button>
       </div>
-      {groups.length > 0 && <p className="note num">{items.length} items · {totalPcs} pieces in stock</p>}
+      {groups.length > 0 && <p className="note num">{t("stock.items", { n: items.length })} · {t("stock.piecesInStock", { n: totalPcs })}</p>}
       {!groups.length && (
         <div className="empty">
-          <h3>No stock yet</h3>
-          <p>Add each product with its sizes and how many pieces you have. Example: T-shirt, sizes “S, M, L, XL”, 20 pieces each.</p>
+          <h3>{t("stock.emptyTitle")}</h3>
+          <p>{t("stock.emptyText")}</p>
         </div>
       )}
       <div className="flow">
       {groups.map((g) => {
-        const total = g.items.reduce((t, i) => t + (stock[i.id] ?? 0), 0);
+        const total = g.items.reduce((sum, i) => sum + (stock[i.id] ?? 0), 0);
         return (
           <section className="group" key={g.key}>
             <div className="group-h">
               <h3>{g.name}</h3>
-              <span className="num">{total} pcs</span>
+              <span className="num">{t("common.pcs", { n: total })}</span>
             </div>
             {g.items.map((it) => {
               const n = stock[it.id] ?? 0;
               return (
                 <div className="row" key={it.id}>
-                  <button className={`qrthumb ${it.qrUrl ? "has" : ""}`} onClick={() => (it.qrUrl ? setZoom(it) : setEdit(it))} aria-label={it.qrUrl ? "Show QR" : "Add QR picture"}>
-                    {it.qrUrl ? <img src={it.qrUrl} alt="" /> : "+ QR"}
+                  <button className={`qrthumb ${it.qrUrl ? "has" : ""}`} onClick={() => (it.qrUrl ? setZoom(it) : setEdit(it))} aria-label={it.qrUrl ? t("stock.showQr") : t("stock.addQr")}>
+                    {it.qrUrl ? <img src={it.qrUrl} alt="" /> : t("stock.plusQr")}
                   </button>
                   <div className="lbl">
                     <b>
-                      {it.variant || "One size"}
-                      {!it.visible && <span className="hidden-tag" title="Hidden from fans">{Icon.eyeOff} hidden</span>}
+                      {it.variant || t("common.oneSize")}
+                      {!it.visible && <span className="hidden-tag" title={t("stock.hiddenTitle")}>{Icon.eyeOff} {t("stock.hidden")}</span>}
                     </b>
                     <small className="num">{money(it.price, cur)}</small>
                   </div>
-                  <span className={`pill ${pill(n)} num`} title={n < 0 ? "Oversold: more sold than counted" : undefined}>
-                    {n < 0 ? `${n} over` : n}
+                  <span className={`pill ${pill(n)} num`} title={n < 0 ? t("stock.oversold") : undefined}>
+                    {n < 0 ? t("stock.over", { m: Math.abs(n) }) : n}
                   </span>
                   <div className="row-act">
-                    <button className="sold-btn" disabled={n <= 0} onClick={() => soldOne(it)}>Sold 1</button>
-                    <button className="add-btn" onClick={() => setRestock(it)} aria-label={`Add pieces of ${itemLabel(it)}`}>+ pcs</button>
-                    <button className="icon-btn" onClick={() => setEdit(it)} aria-label={`Edit ${itemLabel(it)}`}>{Icon.edit}</button>
+                    <button className="sold-btn" disabled={n <= 0} onClick={() => soldOne(it)}>{t("stock.sold1")}</button>
+                    <button className="add-btn" onClick={() => setRestock(it)} aria-label={t("stock.addPiecesAria", { label: itemLabel(it) })}>{t("stock.plusPcs")}</button>
+                    <button className="icon-btn" onClick={() => setEdit(it)} aria-label={t("stock.editAria", { label: itemLabel(it) })}>{Icon.edit}</button>
                   </div>
                 </div>
               );
@@ -94,6 +96,7 @@ export default function Stock() {
 }
 
 function RestockSheet({ item, onClose }: { item: Item; onClose: () => void }) {
+  const t = useT();
   const { stock } = useBand();
   const toast = useToast();
   const now = stock[item.id] ?? 0;
@@ -104,17 +107,17 @@ function RestockSheet({ item, onClose }: { item: Item; onClose: () => void }) {
   const doAdd = (d: number) => {
     if (!d) return;
     addStock(item.id, d, now).catch((e) => toast(errorText(e)));
-    toast(`${d > 0 ? "Added" : "Removed"} ${Math.abs(d)} × ${itemLabel(item)}`);
+    toast(t(d > 0 ? "stock.added" : "stock.removed", { n: Math.abs(d), label: itemLabel(item) }));
     onClose();
   };
   return (
-    <Sheet title={`Stock · ${itemLabel(item)}`} onClose={onClose}>
+    <Sheet title={t("stock.title", { label: itemLabel(item) })} onClose={onClose}>
       <div className="grand">
-        <span>In stock now</span>
+        <span>{t("stock.inStockNow")}</span>
         <b className="num">{now}</b>
       </div>
       <div className="field">
-        <span className="label">Add pieces (new box arrived)</span>
+        <span className="label">{t("stock.addPieces")}</span>
         <div className="sizes">
           {[1, 5, 10, 25].map((v) => (
             <button key={v} className="btn ghost sm" onClick={() => doAdd(v)}>+{v}</button>
@@ -128,8 +131,8 @@ function RestockSheet({ item, onClose }: { item: Item; onClose: () => void }) {
           doAdd(n);
         }}
       >
-        <input id="rsAdd" type="number" inputMode="numeric" step="1" placeholder="Other amount" value={add} onChange={(e) => setAdd(e.target.value)} aria-label="Pieces to add" />
-        <button className="btn primary" disabled={!n}>Add {n > 0 ? n : ""}</button>
+        <input id="rsAdd" type="number" inputMode="numeric" step="1" placeholder={t("stock.otherAmount")} value={add} onChange={(e) => setAdd(e.target.value)} aria-label={t("stock.piecesToAdd")} />
+        <button className="btn primary" disabled={!n}>{t("stock.addN", { n: n > 0 ? n : "" })}</button>
       </form>
       <form
         className="field"
@@ -137,14 +140,14 @@ function RestockSheet({ item, onClose }: { item: Item; onClose: () => void }) {
           e.preventDefault();
           const q = Math.max(0, parseInt(exact) || 0);
           setStockCount(item.id, q).catch((x) => toast(errorText(x)));
-          toast(`${itemLabel(item)} set to ${q} pcs`);
+          toast(t("stock.setTo", { label: itemLabel(item), n: q }));
           onClose();
         }}
       >
-        <label htmlFor="rsExact">Or correct the count after counting the box</label>
+        <label htmlFor="rsExact">{t("stock.correct")}</label>
         <div className="row-form">
           <input id="rsExact" type="number" inputMode="numeric" min="0" step="1" value={exact} onChange={(e) => setExact(e.target.value)} />
-          <button className="btn ghost">Set count</button>
+          <button className="btn ghost">{t("stock.setCount")}</button>
         </div>
       </form>
     </Sheet>
@@ -152,6 +155,7 @@ function RestockSheet({ item, onClose }: { item: Item; onClose: () => void }) {
 }
 
 function ItemSheet({ item, onClose }: { item: Item | null; onClose: () => void }) {
+  const t = useT();
   const { items, stock } = useBand();
   const { settings } = useSettings();
   const toast = useToast();
@@ -186,57 +190,57 @@ function ItemSheet({ item, onClose }: { item: Item | null; onClose: () => void }
       }
       if (q !== (stock[item.id] ?? 0)) done(setStockCount(item.id, q));
       if (applyQrToGroup) siblings.forEach((s) => done(updateItem(s.id, { qrUrl: qr?.url ?? null, qrPath: qr?.path ?? null })));
-      toast(`${itemLabel({ name, variant })} saved`);
+      toast(t("item.saved", { label: itemLabel({ name, variant }) }));
     } else {
       const variants = variant.split(",").map((v) => v.trim()).filter(Boolean);
       const order = Math.max(0, ...items.map((i) => i.order ?? 0)) + 1;
       done(createItems({ name: name.trim(), price: p, qrUrl: qr?.url ?? null, qrPath: qr?.path ?? null, visible, images: shownPhotos }, variants, q, order));
-      toast(variants.length > 1 ? `Added ${variants.length} sizes of ${name.trim()}` : `${name.trim()} added`);
+      toast(variants.length > 1 ? t("item.addedSizes", { n: variants.length, name: name.trim() }) : t("item.added", { name: name.trim() }));
     }
     onClose();
   };
 
   return (
-    <Sheet title={item ? "Edit item" : "Add item"} onClose={onClose}>
+    <Sheet title={item ? t("item.editTitle") : t("item.addTitle")} onClose={onClose}>
       <form className="stack" onSubmit={submit}>
         <div className="field">
-          <label htmlFor="fName">Item</label>
-          <input id="fName" list="nameList" required value={name} onChange={(e) => setName(e.target.value)} placeholder="T-shirt, White hat, Cup…" />
+          <label htmlFor="fName">{t("item.item")}</label>
+          <input id="fName" list="nameList" required value={name} onChange={(e) => setName(e.target.value)} placeholder={t("item.itemPh")} />
           <datalist id="nameList">{names.map((n) => <option key={n} value={n} />)}</datalist>
-          <span className="hint">Use the same name for every size so they group together.</span>
+          <span className="hint">{t("item.itemHint")}</span>
         </div>
         <div className="field">
-          <label htmlFor="fVar">Size or variant</label>
-          <input id="fVar" value={variant} onChange={(e) => setVariant(e.target.value)} placeholder={item ? "Leave empty for one size" : "S, M, L, XL"} />
-          <span className="hint">{item ? "Leave empty if there's only one size." : "Leave empty for one size. Separate with commas to add several sizes at once."}</span>
+          <label htmlFor="fVar">{t("item.variant")}</label>
+          <input id="fVar" value={variant} onChange={(e) => setVariant(e.target.value)} placeholder={item ? t("item.variantPhEdit") : t("item.variantPhNew")} />
+          <span className="hint">{item ? t("item.variantHintEdit") : t("item.variantHintNew")}</span>
         </div>
         <div className="two">
           <div className="field">
-            <label htmlFor="fPrice">Price ({settings.currency})</label>
+            <label htmlFor="fPrice">{t("item.price", { cur: settings.currency })}</label>
             <input id="fPrice" type="number" inputMode="decimal" min="0" step="0.01" required value={price} onChange={(e) => setPrice(e.target.value)} />
           </div>
           <div className="field">
-            <label htmlFor="fCount">{item ? "Pieces in stock" : "Pieces (each size)"}</label>
+            <label htmlFor="fCount">{item ? t("item.pieces") : t("item.piecesEach")}</label>
             <input id="fCount" type="number" inputMode="numeric" min="0" step="1" required value={count} onChange={(e) => setCount(e.target.value)} />
           </div>
         </div>
-        <PhotosField label="Photos" photos={shownPhotos} onChange={setPhotos} hint="Fans scroll through these on the shop page. The first photo is the main one. All sizes of this item share the same photos." />
-        <ImageField label="Payment QR picture" folder="qr" url={qr?.url ?? null} onChange={setQr} hint="A screenshot of the QR from your payment app (SumUp, Revolut, bank app…). Fans scan it to pay this item." />
+        <PhotosField label={t("item.photos")} photos={shownPhotos} onChange={setPhotos} hint={t("item.photosHint")} />
+        <ImageField label={t("item.qr")} folder="qr" url={qr?.url ?? null} onChange={setQr} hint={t("item.qrHint")} />
         {item && siblings.length > 0 && (
-          <Toggle id="fGroupQr" checked={applyQrToGroup} onChange={setApplyQrToGroup} label={`Use this QR for all ${item.name} sizes`} hint={`Also sets it on ${siblings.map((s) => s.variant || "one size").join(", ")}.`} />
+          <Toggle id="fGroupQr" checked={applyQrToGroup} onChange={setApplyQrToGroup} label={t("item.qrAll", { name: item.name })} hint={t("item.qrAllHint", { list: siblings.map((s) => s.variant || t("item.oneSizeLower")).join(", ") })} />
         )}
-        <Toggle id="fVisible" checked={visible} onChange={setVisible} label="Show on the fan page" hint="Hidden items stay in stock and can still be sold here." />
-        <button className="btn primary block">{item ? "Save changes" : "Add to stock"}</button>
+        <Toggle id="fVisible" checked={visible} onChange={setVisible} label={t("item.visible")} hint={t("item.visibleHint")} />
+        <button className="btn primary block">{item ? t("item.saveChanges") : t("item.addToStock")}</button>
         {item && (
           <ConfirmButton
-            confirmText="Tap again to delete"
+            confirmText={t("item.confirmDelete")}
             onConfirm={() => {
               deleteItem(item.id).catch((e) => toast(errorText(e)));
-              toast(`${itemLabel(item)} deleted`);
+              toast(t("item.deleted", { label: itemLabel(item) }));
               onClose();
             }}
           >
-            Delete item
+            {t("item.delete")}
           </ConfirmButton>
         )}
       </form>

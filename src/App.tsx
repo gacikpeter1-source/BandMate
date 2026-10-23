@@ -7,6 +7,8 @@ import { useLiveDoc } from "./lib/live";
 import { AuthProvider } from "./state/auth";
 import { SettingsProvider } from "./state/settings";
 import { TenantProvider } from "./state/tenant";
+import { useT } from "./i18n";
+import LangSwitch from "./components/LangSwitch";
 import { ToastProvider } from "./state/toast";
 import TenantGate from "./components/TenantGate";
 import { Loading } from "./components/ui";
@@ -19,13 +21,14 @@ import StartPage from "./pages/platform/StartPage";
 import TermsPage from "./pages/platform/TermsPage";
 
 export default function App() {
+  const t = useT();
   if (!firebaseConfigured) {
     return (
       <main className="page">
         <div className="wrap">
           <div className="empty">
-            <h3>Firebase isn't connected yet</h3>
-            <p>Add the VITE_FIREBASE_* values from your Firebase project to .env.local (or to Vercel's environment variables) and reload. See README step 3.</p>
+            <h3>{t("setup.title")}</h3>
+            <p>{t("setup.text")}</p>
           </div>
         </div>
       </main>
@@ -65,6 +68,7 @@ function PathBand() {
 }
 
 function HostBand({ host }: { host: string }) {
+  const t = useT();
   const d = useLiveDoc<{ bandId: string }>(() => doc(db, "domains", host), `domain-${host}`);
   if (!d.ready) return <main className="page"><div className="wrap"><Loading /></div></main>;
   // An address listed in `domains` wins; otherwise <bandId>.bandmate.shop opens that band.
@@ -73,8 +77,9 @@ function HostBand({ host }: { host: string }) {
     return (
       <main className="page auth">
         <div className="authcard">
-          <h1>Address not set up</h1>
-          <p className="note">{host} isn't connected to a band on BandMate yet.</p>
+          <div className="card-top"><span /><LangSwitch /></div>
+          <h1>{t("host.title")}</h1>
+          <p className="note">{t("host.text", { host })}</p>
         </div>
       </main>
     );

@@ -1,4 +1,5 @@
 import { createContext, useCallback, useContext, useRef, useState, type ReactNode } from "react";
+import { useT } from "../i18n";
 
 interface ToastItem {
   msg: string;
@@ -7,6 +8,7 @@ interface ToastItem {
 const Ctx = createContext<(msg: string, undo?: () => void) => void>(() => {});
 
 export function ToastProvider({ children }: { children: ReactNode }) {
+  const tt = useT();
   const [t, setT] = useState<ToastItem | null>(null);
   const timer = useRef<number>();
   const show = useCallback((msg: string, undo?: () => void) => {
@@ -28,7 +30,7 @@ export function ToastProvider({ children }: { children: ReactNode }) {
                 u?.();
               }}
             >
-              Undo
+              {tt("common.undo")}
             </button>
           )}
         </div>

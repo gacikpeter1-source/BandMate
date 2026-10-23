@@ -9,6 +9,8 @@ import { useLiveQuery } from "../../lib/live";
 import { errorText } from "../../lib/format";
 import { useAuth } from "../../state/auth";
 import { useToast } from "../../state/toast";
+import { useT } from "../../i18n";
+import LangSwitch from "../../components/LangSwitch";
 import { Loading } from "../../components/ui";
 import type { BandInfo } from "../../state/tenant";
 import type { BandRequest } from "../../types";
@@ -18,6 +20,7 @@ type DomainRow = { id: string; bandId: string };
 
 /** BandMate operator console: new band requests, and every band with the addresses that open it. */
 export default function PlatformConsole() {
+  const t = useT();
   const { user, isPlatform, ready } = useAuth();
   const toast = useToast();
   const bands = useLiveQuery<BandRow>(() => (isPlatform ? bandsCol() : null), `platform-bands-${isPlatform}`);
@@ -27,14 +30,15 @@ export default function PlatformConsole() {
   const [busy, setBusy] = useState("");
 
   if (!ready) return <main className="page"><div className="wrap"><Loading /></div></main>;
-  if (!user) return <main className="page"><div className="wrap"><Link to="/platform/login">Sign in to BandMate admin</Link></div></main>;
+  if (!user) return <main className="page"><div className="wrap"><Link to="/platform/login">{t("con.signInLink")}</Link></div></main>;
   if (!isPlatform)
     return (
       <main className="page auth">
         <div className="authcard">
-          <h1>No access</h1>
-          <p className="note">{user.email} is not a BandMate admin.</p>
-          <button className="btn ghost block" onClick={() => signOut(auth)}>Sign out</button>
+          <div className="card-top"><span /><LangSwitch /></div>
+          <h1>{t("con.noAccess")}</h1>
+          <p className="note">{t("con.notAdmin", { email: user.email ?? "" })}</p>
+          <button className="btn ghost block" onClick={() => signOut(auth)}>{t("common.signOut")}</button>
         </div>
       </main>
     );
@@ -47,30 +51,30 @@ export default function PlatformConsole() {
   return (
     <main className="page">
       <div className="wrap">
-        <h1>BandMate admin</h1>
-        <p className="note">Signed in as {user.email}</p>
+        <div className="card-top"><h1>{t("con.title")}</h1><LangSwitch /></div>
+        <p className="note">{t("con.signedInAs", { email: user.email ?? "" })}</p>
 
-        <h2 className="sec">New band requests {requests.data.length ? `(${requests.data.length})` : ""}</h2>
+        <h2 className="sec">{t("con.requests")} {requests.data.length ? `(${requests.data.length})` : ""}</h2>
         {!requests.ready ? (
           <Loading />
         ) : requests.data.length === 0 ? (
-          <p className="note">No requests waiting.</p>
+          <p className="note">{t("con.none")}</p>
         ) : (
           requests.data.map((r) => (
             <section className="card" key={r.id}>
               <h2 className="card-h">{r.bandName}</h2>
-              <p className="note">Address: <b>{r.bandId}.{PLATFORM_HOST}</b></p>
-              {r.domain && <p className="note">Own domain: {r.domain} (add it in Vercel and Firebase after approving)</p>}
-              <p className="note">{r.displayName} · {r.email} · agreed to terms {r.termsVersion}</p>
+              <p className="note">{t("con.address", { addr: `${r.bandId}.${PLATFORM_HOST}` })}</p>
+              {r.domain && <p className="note">{t("con.ownDomain", { d: r.domain })}</p>}
+              <p className="note">{t("con.byline", { name: r.displayName, email: r.email, v: r.termsVersion })}</p>
               <div className="stack-sm">
-                <button className="btn primary" disabled={busy === r.id} onClick={() => run(r.id, approveBandRequest(r), `${r.bandName} approved`)}>Approve and create the band</button>
-                <button className="btn ghost" disabled={busy === r.id} onClick={() => run(r.id, rejectBandRequest(r.id), "Request rejected")}>Reject</button>
+                <button className="btn primary" disabled={busy === r.id} onClick={() => run(r.id, approveBandRequest(r), t("con.approved", { name: r.bandName }))}>{t("con.approve")}</button>
+                <button className="btn ghost" disabled={busy === r.id} onClick={() => run(r.id, rejectBandRequest(r.id), t("con.rejected"))}>{t("con.reject")}</button>
               </div>
             </section>
           ))
         )}
 
-        <h2 className="sec">Bands</h2>
+        <h2 className="sec">{t("con.bands")}</h2>
         {!bands.ready ? (
           <Loading />
         ) : (
@@ -78,16 +82,16 @@ export default function PlatformConsole() {
             <section className="card" key={b.id}>
               <h2 className="card-h">{b.name}</h2>
               <p className="note">
-                {b.id} · {b.status === "active" ? "active" : "paused"}
+                {b.id} · {b.status === "active" ? t("con.statusActive") : t("con.statusPaused")}
               </p>
               <p className="note">
-                Addresses: {[`${b.id}.${PLATFORM_HOST}`, ...domains.data.filter((d) => d.bandId === b.id).map((d) => d.id)].join(", ")}
+                {t("con.addresses", { list: [`${b.id}.${PLATFORM_HOST}`, ...domains.data.filter((d) => d.bandId === b.id).map((d) => d.id)].join(", ") })}
               </p>
               <div className="stack-sm">
-                <Link className="btn ghost" to={`/b/${b.id}`}>Open store</Link>
-                <Link className="btn primary" to={`/b/${b.id}/band`}>Open desk</Link>
-                <button className="btn ghost" disabled={busy === b.id} onClick={() => run(b.id, setBandStatus(b.id, b.status === "active" ? "paused" : "active"), b.status === "active" ? `${b.name} paused` : `${b.name} is live again`)}>
-                  {b.status === "active" ? "Pause this band" : "Resume this band"}
+                <Link className="btn ghost" to={`/b/${b.id}`}>{t("con.openStore")}</Link>
+                <Link className="btn primary" to={`/b/${b.id}/band`}>{t("con.openDesk")}</Link>
+                <button className="btn ghost" disabled={busy === b.id} onClick={() => run(b.id, setBandStatus(b.id, b.status === "active" ? "paused" : "active"), b.status === "active" ? t("con.paused", { name: b.name }) : t("con.live", { name: b.name }))}>
+                  {b.status === "active" ? t("con.pause") : t("con.resume")}
                 </button>
               </div>
               <form
@@ -95,16 +99,16 @@ export default function PlatformConsole() {
                 onSubmit={(e) => {
                   e.preventDefault();
                   const host = (newDomain[b.id] || "").trim();
-                  if (host) run(`d-${b.id}`, addBandDomain(host, b.id).then(() => setNewDomain((m) => ({ ...m, [b.id]: "" }))), `${host} now opens ${b.name}`);
+                  if (host) run(`d-${b.id}`, addBandDomain(host, b.id).then(() => setNewDomain((m) => ({ ...m, [b.id]: "" }))), t("con.domainAdded", { host, name: b.name }));
                 }}
               >
-                <input value={newDomain[b.id] || ""} onChange={(e) => setNewDomain((m) => ({ ...m, [b.id]: e.target.value }))} placeholder="Add the band's own domain" aria-label={`Add a domain for ${b.name}`} autoCapitalize="none" spellCheck={false} />
-                <button className="btn ghost" disabled={!(newDomain[b.id] || "").trim()}>Add</button>
+                <input value={newDomain[b.id] || ""} onChange={(e) => setNewDomain((m) => ({ ...m, [b.id]: e.target.value }))} placeholder={t("con.addDomainPh")} aria-label={t("con.addDomainAria", { name: b.name })} autoCapitalize="none" spellCheck={false} />
+                <button className="btn ghost" disabled={!(newDomain[b.id] || "").trim()}>{t("con.add")}</button>
               </form>
             </section>
           ))
         )}
-        <button className="btn ghost block" onClick={() => signOut(auth)}>Sign out</button>
+        <button className="btn ghost block" onClick={() => signOut(auth)}>{t("common.signOut")}</button>
       </div>
     </main>
   );

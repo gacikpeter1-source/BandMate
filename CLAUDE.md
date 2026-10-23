@@ -27,9 +27,13 @@ email/password, Firestore, Storage), hosted on Vercel, code on GitHub. Setup ste
   the operator still can.
 - Operator ("BandMate admin") = a doc in `platformAdmins/{uid}`, created only by script. Full access to all bands.
   The "BandMate admin" link appears only on a band's login screen, never when signed in.
-- bandmate.shop home also has "Already have a band here? Sign in": type the band address (name, name.bandmate.shop or its
-  own domain) and it goes to that band's `/login`. The operator login (`/platform/login`) is deliberately not linked there.
-- Getting a band (self-service): bandmate.shop home -> "Start Your BandMate" button (`/start`, `src/pages/platform/StartPage.tsx`).
+- bandmate.shop home (`PlatformHome.tsx`) is deliberately simple: email + password + "Login", and "Start Your BandMate"
+  right below it. After login (same origin, so the session carries): exactly one band -> straight to `/b/<id>/band`;
+  several -> a list; none -> "not part of a band yet" + Start button; the operator also gets the admin console button.
+  "Which bands am I in" = `fetchMyBands` collection-group query on `members.email` (`lib/memberships.ts`; rule
+  `/{path=**}/members/{id}` returns only docs with the signed-in verified email; needs the `members.email` collection-group
+  index in `firestore.indexes.json`). The operator login at `/platform/login` still exists.
+- Getting a band (self-service): bandmate.shop home "Start Your BandMate" button (`/start`, `src/pages/platform/StartPage.tsx`).
   A verified account files ONE request (`bandRequests/{uid}`: band name, wanted address = future `bandId`, optional own
   domain, `termsVersion` + server-stamped `termsAcceptedAt`). The operator approves it in `/platform`
   (`approveBandRequest` in `src/lib/platform.ts`, one transaction: band, default settings, founder as `admin` member,
@@ -76,6 +80,21 @@ Accounts made by the scripts are marked verified. Unverified Auth accounts stay 
   Photos are shrunk to 1400px WebP on the phone before upload (`src/lib/images.ts`); max 6 per product.
   Fan page shows them in a swipeable `PhotoCarousel` with a full-screen `PhotoViewer` (`src/components/ui.tsx`).
 
+## Languages (English + Slovak)
+- Every visible phrase lives in `src/i18n/en.ts` and `src/i18n/sk.ts` (same keys; `sk` is typed against `en`, so a missing
+  key fails `tsc`). Pages use `const t = useT(); t("key", { name })`; code outside React (helpers, thrown errors) uses
+  `tr("key", vars)`. Never put English text straight into JSX, placeholders, aria-labels, toasts or thrown errors.
+- `{name}` = filled-in blank (must match in both languages). Plurals: `"one|other"` in English, `"one|few|many"` in Slovak
+  (1 | 2-4 | 5+), chosen by the `n` variable: `t("stock.items", { n })`.
+- Slovak uses the informal "ty" form. Brand and network names (BandMate, Instagram, QR) stay untranslated.
+- Language = the visitor's choice (saved in localStorage `bandmate-lang`), else Slovak if the browser prefers Slovak, else
+  English (`src/i18n/index.tsx`). `LangSwitch` (EN | SK) sits top-right on the front page, login/registration cards, fan page,
+  band desk header, Settings > account. It also sets Firebase's email language (`auth.languageCode`).
+- Add a language: new `xx.ts` typed like `sk.ts`, add it to `DICT`/`LANGS`/`Lang` in `src/i18n/index.tsx`, adjust `pick()` for
+  its plural rule. Dates/numbers use `currentLocale()`.
+- `npm run test:i18n` checks both files have the same keys, same blanks, complete plural forms, and that every `t("key")`
+  in the code exists. The terms text (`terms.*`) is a PLACEHOLDER in both languages.
+
 ## Conventions
 - All stock changes go through `src/lib/ops.ts` (batched `increment()`, works offline). Don't await
   commits in UI handlers; attach `.catch(toast)` so the desk keeps working with no signal.
@@ -102,6 +121,7 @@ Design for a phone in one hand first (320-430px), then scale up. Never assume a 
 - `npm run dev` — local dev (needs `.env.local`, see `.env.example`)
 - `npm run build` — typecheck + build (run before every commit)
 - `npm run test:rules` — security-rules tests on the emulators (needs Java 11+)
+- `npm run test:i18n` — translation completeness (no emulators needed)
 - `npx firebase deploy --only firestore:rules,storage` — deploy rules
 - `node scripts/create-band.mjs`, `create-platform-admin.mjs`, `migrate-to-multitenant.mjs` with `GOOGLE_APPLICATION_CREDENTIALS` set
   (or the emulator env vars, see `scripts/lib.mjs`)
@@ -116,7 +136,7 @@ Add the Vercel domain (and every band domain) to Firebase Auth → Settings → 
 verification email link will fail there.
 
 ## Ideas not built yet
-Planned in order: automatic Vercel/Firebase setup for a band's own domain (needs Vercel token + Cloud Functions) and
-an email to the founder when approved; Slovak/English; Stripe (band subscription replaces manual approval, then
+Planned in order: more languages (the system is ready); automatic Vercel/Firebase setup for a band's own domain (needs Vercel token + Cloud Functions) and
+an email to the founder when approved; Stripe (band subscription replaces manual approval, then
 Connect so sales payments go to each band; manual QR payments stay); cleanup of unverified accounts.
 Also: CSV export of sales, low-stock alerts, final terms text.

@@ -5,10 +5,13 @@ import { useAuth } from "../../state/auth";
 import { useToast } from "../../state/toast";
 import { errorText, itemLabel, money, timeLabel } from "../../lib/format";
 import { setSaleUndone } from "../../lib/ops";
+import { useT, type Key } from "../../i18n";
 
-const METHOD: Record<string, string> = { qr: "QR", cash: "Cash", card: "Card", quick: "Quick" };
+const METHOD: Record<string, Key> = { qr: "pay.qr", cash: "pay.cash", card: "pay.card", quick: "pay.quick" };
 
 export default function Sales() {
+  const tt = useT();
+  const method = (m: string) => (METHOD[m] ? tt(METHOD[m]) : m);
   const { sales, band, stock, items } = useBand();
   const { settings } = useSettings();
   const { profile } = useAuth();
@@ -33,43 +36,43 @@ export default function Sales() {
     const s = sales.find((x) => x.id === id);
     if (!s) return;
     setSaleUndone(s, undone, stock, items).catch((e) => toast(errorText(e)));
-    toast(undone ? "Sale cancelled, stock put back" : "Sale restored");
+    toast(undone ? tt("sales.toastCancelled") : tt("sales.toastRestored"));
   };
 
   return (
     <>
       <div className="toolbar center-y">
-        <label htmlFor="gigFilter" className="note">Showing</label>
+        <label htmlFor="gigFilter" className="note">{tt("sales.showing")}</label>
         <select id="gigFilter" className="filter" value={gig} onChange={(e) => setGig(e.target.value)}>
-          <option value="__all">All gigs</option>
-          {gigs.map((g) => <option key={g} value={g}>{g || "No gig set"}</option>)}
+          <option value="__all">{tt("sales.allGigs")}</option>
+          {gigs.map((g) => <option key={g} value={g}>{g || tt("sales.noGig")}</option>)}
         </select>
       </div>
       <div className="stats">
-        <div className="stat"><small>Takings</small><b className="num">{money(revenue, cur)}</b></div>
-        <div className="stat"><small>Pieces</small><b className="num">{pcs}</b></div>
-        <div className="stat"><small>Sales</small><b className="num">{live.length}</b></div>
+        <div className="stat"><small>{tt("sales.takings")}</small><b className="num">{money(revenue, cur)}</b></div>
+        <div className="stat"><small>{tt("sales.pieces")}</small><b className="num">{pcs}</b></div>
+        <div className="stat"><small>{tt("sales.sales")}</small><b className="num">{live.length}</b></div>
       </div>
       {Object.keys(byMethod).length > 0 && (
         <div className="methods">
           {Object.entries(byMethod).sort((a, b) => b[1] - a[1]).map(([m, v]) => (
             <div className="mrow" key={m}>
-              <span>{METHOD[m] || m}</span>
+              <span>{method(m)}</span>
               <div className="bar"><i style={{ width: `${(v / maxM) * 100}%` }} /></div>
               <b className="num">{money(v, cur)}</b>
             </div>
           ))}
           {top.length > 0 && (
             <p className="note">
-              Best sellers: {top.map(([id, n]) => `${itemLabel(items.find((i) => i.id === id))} ×${n}`).join(" · ")}
+              {tt("sales.best", { list: top.map(([id, n]) => `${itemLabel(items.find((i) => i.id === id))} ×${n}`).join(" · ") })}
             </p>
           )}
         </div>
       )}
       {!list.length ? (
         <div className="empty">
-          <h3>No sales yet</h3>
-          <p>Every sale from the Sell tab or the Sold 1 button shows up here, with who sold it and how it was paid.</p>
+          <h3>{tt("sales.emptyTitle")}</h3>
+          <p>{tt("sales.emptyText")}</p>
         </div>
       ) : (
         list.map((s) => (
@@ -87,12 +90,12 @@ export default function Sales() {
             <div className="total num">{money(s.total, cur)}</div>
             <div className="meta">
               <span className="num">{timeLabel(s.at)}</span>
-              <span className="mpill">{METHOD[s.method] || s.method}</span>
-              <span>{s.by === profile?.id ? "You" : s.byName}</span>
+              <span className="mpill">{method(s.method)}</span>
+              <span>{s.by === profile?.id ? tt("sales.you") : s.byName}</span>
               {s.gig && gig === "__all" && <span>{s.gig}</span>}
-              {s.undone && <span>Cancelled</span>}
+              {s.undone && <span>{tt("sales.cancelled")}</span>}
             </div>
-            <button className="btn sm ghost" onClick={() => toggle(s.id, !s.undone)}>{s.undone ? "Restore" : "Undo"}</button>
+            <button className="btn sm ghost" onClick={() => toggle(s.id, !s.undone)}>{s.undone ? tt("sales.restore") : tt("sales.undo")}</button>
           </div>
         ))
       )}

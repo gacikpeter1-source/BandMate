@@ -1,13 +1,15 @@
 import { updateDoc } from "firebase/firestore";
 import { bandDoc } from "../../lib/scope";
 import { useBand } from "../../state/band";
-import { ROLE_LABEL, useAuth } from "../../state/auth";
+import { roleLabel, useAuth } from "../../state/auth";
+import { useT } from "../../i18n";
 import { useToast } from "../../state/toast";
 import { errorText, timeLabel } from "../../lib/format";
 import type { Role, UserProfile } from "../../types";
 
 /** Admin only: approve sign-ups and change roles. */
 export default function Users() {
+  const t = useT();
   const { users } = useBand();
   const { profile } = useAuth();
   const toast = useToast();
@@ -17,54 +19,54 @@ export default function Users() {
   const setRole = (u: UserProfile, role: Role) => {
     const extra = role === "bandmate" && u.role === "pending" ? { approvedBy: profile!.id, approvedAt: Date.now() } : {};
     updateDoc(bandDoc("members", u.id), { role, ...extra }).catch((e) => toast(errorText(e)));
-    toast(role === "bandmate" && u.role === "pending" ? `${u.displayName || u.email} is now a BandMate` : `${u.displayName || u.email}: ${ROLE_LABEL[role]}`);
+    toast(role === "bandmate" && u.role === "pending" ? t("users.nowBandmate", { name: u.displayName || u.email }) : t("users.roleSet", { name: u.displayName || u.email, role: roleLabel(role) }));
   };
 
   return (
     <>
       <section className="card">
-        <h2 className="card-h">Waiting for approval</h2>
+        <h2 className="card-h">{t("users.waiting")}</h2>
         {!pending.length ? (
-          <p className="note">Nobody is waiting. New band members sign up at the “Create an account” link on the login page, then appear here.</p>
+          <p className="note">{t("users.nobody")}</p>
         ) : (
           pending.map((u) => (
             <div className="person" key={u.id}>
               <div className="lbl">
-                <b>{u.displayName || "No name"}</b>
-                <small>{u.email}{u.createdAt ? ` · signed up ${timeLabel(u.createdAt)}` : ""}</small>
+                <b>{u.displayName || t("users.noName")}</b>
+                <small>{u.email}{u.createdAt ? ` · ${t("users.signedUp", { when: timeLabel(u.createdAt) })}` : ""}</small>
               </div>
               <div className="row-act">
-                <button className="btn primary sm" onClick={() => setRole(u, "bandmate")}>Approve as BandMate</button>
-                <button className="btn ghost sm" onClick={() => setRole(u, "disabled")}>Reject</button>
+                <button className="btn primary sm" onClick={() => setRole(u, "bandmate")}>{t("users.approve")}</button>
+                <button className="btn ghost sm" onClick={() => setRole(u, "disabled")}>{t("users.reject")}</button>
               </div>
             </div>
           ))
         )}
       </section>
       <section className="card">
-        <h2 className="card-h">Everyone</h2>
+        <h2 className="card-h">{t("users.everyone")}</h2>
         {others.map((u) => {
           const self = u.id === profile?.id;
           return (
             <div className="person" key={u.id}>
               <div className="lbl">
-                <b>{u.displayName || "No name"}{self ? " (you)" : ""}</b>
+                <b>{u.displayName || t("users.noName")}{self ? ` ${t("users.you")}` : ""}</b>
                 <small>{u.email}</small>
               </div>
               {self ? (
-                <span className="pill ok">{ROLE_LABEL[u.role]}</span>
+                <span className="pill ok">{roleLabel(u.role)}</span>
               ) : (
-                <select className="filter" value={u.role} onChange={(e) => setRole(u, e.target.value as Role)} aria-label={`Role for ${u.displayName || u.email}`}>
-                  <option value="bandmate">BandMate</option>
-                  <option value="admin">Admin</option>
-                  <option value="disabled">Disabled</option>
-                  <option value="pending">Back to waiting</option>
+                <select className="filter" value={u.role} onChange={(e) => setRole(u, e.target.value as Role)} aria-label={t("users.roleFor", { name: u.displayName || u.email })}>
+                  <option value="bandmate">{roleLabel("bandmate")}</option>
+                  <option value="admin">{roleLabel("admin")}</option>
+                  <option value="disabled">{roleLabel("disabled")}</option>
+                  <option value="pending">{t("users.backToWaiting")}</option>
                 </select>
               )}
             </div>
           );
         })}
-        <p className="note">BandMates run the whole merch desk: stock, QR pictures, bundles, sales and the band's look. Admins can also approve people and change roles.</p>
+        <p className="note">{t("users.note")}</p>
       </section>
     </>
   );

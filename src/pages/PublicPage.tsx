@@ -7,12 +7,15 @@ import { groupItems, itemLabel, money, priceTag } from "../lib/format";
 import { useSettings } from "../state/settings";
 import { useAuth, isStaff } from "../state/auth";
 import { useTenant } from "../state/tenant";
+import { useT } from "../i18n";
+import LangSwitch from "../components/LangSwitch";
 import { LogoBackdrop, TopBar } from "../components/brand";
 import { Loading, PhotoCarousel, PhotoViewer, QrFull } from "../components/ui";
 import type { Bundle, Item, Photo } from "../types";
 
 /** What fans see: products, prices and payment QR codes. Never stock counts. */
 export default function PublicPage() {
+  const t = useT();
   const { settings, ready } = useSettings();
   const { profile } = useAuth();
   const { bandId } = useTenant();
@@ -37,20 +40,21 @@ export default function PublicPage() {
             <h1>{settings.bandName || (ready ? "Merch" : "")}</h1>
             {settings.tagline && <p>{settings.tagline}</p>}
           </div>
+          <LangSwitch />
         </div>
       </header>
       <main className="page">
         <div className="wrap">
           {!items.ready ? (
-            <Loading text="Loading the merch…" />
+            <Loading text={t("fan.loading")} />
           ) : !groups.length && !bundleList.length ? (
             <div className="empty">
-              <h3>Merch is coming soon</h3>
-              <p>Check back at the next show.</p>
+              <h3>{t("fan.comingTitle")}</h3>
+              <p>{t("fan.comingText")}</p>
             </div>
           ) : (
             <>
-              <p className="lead">Pick an item and scan its QR code to pay. Show the payment confirmation at the merch table to collect it.</p>
+              <p className="lead">{t("fan.lead")}</p>
               <div className="grid">
                 {groups.map((g) => {
                   const single = g.items.length === 1 && !g.items[0].variant;
@@ -65,7 +69,7 @@ export default function PublicPage() {
                       </div>
                       {single ? (
                         <button className="btn primary block" disabled={g.items[0].soldOut} onClick={() => open(g.name, g.items[0].price, g.items[0].qrUrl)}>
-                          {g.items[0].soldOut ? "Sold out" : g.items[0].qrUrl ? "Show payment QR" : "Buy at the table"}
+                          {g.items[0].soldOut ? t("fan.soldOut") : g.items[0].qrUrl ? t("fan.showQr") : t("fan.buyAtTable")}
                         </button>
                       ) : (
                         <>
@@ -76,14 +80,14 @@ export default function PublicPage() {
                                 className="chip"
                                 disabled={it.soldOut}
                                 onClick={() => open(itemLabel(it), it.price, it.qrUrl)}
-                                aria-label={`${itemLabel(it)}${it.soldOut ? ", sold out" : ""}`}
+                                aria-label={it.soldOut ? t("fan.itemSoldOutAria", { label: itemLabel(it) }) : itemLabel(it)}
                               >
-                                <b>{it.variant || "One size"}</b>
-                                <small>{it.soldOut ? "Sold out" : money(it.price, cur)}</small>
+                                <b>{it.variant || t("common.oneSize")}</b>
+                                <small>{it.soldOut ? t("fan.soldOut") : money(it.price, cur)}</small>
                               </button>
                             ))}
                           </div>
-                          <span className="note">Tap your size to see the payment QR.</span>
+                          <span className="note">{t("fan.tapSize")}</span>
                         </>
                       )}
                     </article>
@@ -92,7 +96,7 @@ export default function PublicPage() {
               </div>
               {bundleList.length > 0 && (
                 <>
-                  <h2 className="sec">Bundles</h2>
+                  <h2 className="sec">{t("fan.bundles")}</h2>
                   <div className="grid">
                     {bundleList.map((b) => (
                       <article key={b.id} className={`tile bundle ${b.images?.length ? "photo" : ""}`}>
@@ -105,7 +109,7 @@ export default function PublicPage() {
                           <span className="tag">{money(b.price, cur)}</span>
                         </div>
                         <button className="btn primary block" onClick={() => open(b.name, b.price, b.qrUrl)}>
-                          {b.qrUrl ? "Show payment QR" : "Buy at the table"}
+                          {b.qrUrl ? t("fan.showQr") : t("fan.buyAtTable")}
                         </button>
                       </article>
                     ))}
@@ -115,7 +119,7 @@ export default function PublicPage() {
             </>
           )}
           <footer className="foot">
-            {profile && isStaff(profile.role) ? <Link to="/band">Open the band desk</Link> : <Link to="/login">Band login</Link>}
+            {profile && isStaff(profile.role) ? <Link to="/band">{t("fan.openDesk")}</Link> : <Link to="/login">{t("fan.bandLogin")}</Link>}
           </footer>
         </div>
       </main>

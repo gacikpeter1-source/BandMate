@@ -287,6 +287,13 @@ input[type="range"] { width: 100%; accent-color: var(--primary); }
 .toggle input:checked + i::after { transform: translateX(20px); }
 .toggle input:focus-visible + i { outline: 3px solid var(--primary); outline-offset: 2px; }
 
+/* ---------- language switch ---------- */
+.lang { display: inline-flex; flex: none; border: 1.5px solid var(--line); border-radius: 999px; overflow: hidden; background: var(--surface); }
+.lang button { background: none; border: 0; padding: 0 12px; min-height: 40px; font-weight: 700; font-size: .78rem; letter-spacing: .04em; color: var(--muted); }
+.lang button[aria-pressed="true"] { background: var(--primary); color: var(--on-primary); }
+.top .lang button { padding: 0 9px; min-height: 36px; }
+.card-top { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+
 /* ---------- band registration ---------- */
 .sep { border: 0; border-top: 1px solid var(--line); margin: 6px 0; width: 100%; }
 .addr { display: flex; align-items: stretch; min-width: 0; }

@@ -1,9 +1,10 @@
 // Security rules tests. Run with: npm run test:rules
 // Two active bands (a, b), one paused band (c), and people with different roles in each.
 import { test, before, after, beforeEach } from "node:test";
+import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import { initializeTestEnvironment, assertFails, assertSucceeds } from "@firebase/rules-unit-testing";
-import { doc, getDoc, setDoc, updateDoc, getDocs, collection, query, where, deleteDoc } from "firebase/firestore";
+import { doc, getDoc, setDoc, updateDoc, getDocs, collection, collectionGroup, query, where, deleteDoc } from "firebase/firestore";
 import { ref, uploadBytes } from "firebase/storage";
 
 let env;
@@ -241,4 +242,18 @@ test("band requests: one per verified account, valid address, terms stamped by t
   await assertSucceeds(updateDoc(mine(op), { status: "approved" }));
   await assertFails(deleteDoc(mine(founder))); // approved: the founder can no longer withdraw it
   await assertSucceeds(deleteDoc(doc(as("u-founder2", "f2@x.com"), "bandRequests", "u-founder2"))); // a pending one can be withdrawn
+});
+
+test("'which bands am I in': a person finds only their own memberships, by their own verified email", async () => {
+  const mine = (db, email) => getDocs(query(collectionGroup(db, "members"), where("email", "==", email)));
+  const me = as(ids.both, "u-both@x.com");
+  const res = await assertSucceeds(mine(me, "u-both@x.com"));
+  assert.equal(res.size, 2); // band mate in A, pending in B
+  await assertFails(mine(me, "u-admin-a@x.com")); // someone else's memberships
+  await assertFails(mine(me, "u-mate-b@x.com"));
+  await assertFails(mine(as(ids.both, "u-both@x.com", false), "u-both@x.com")); // unverified email
+  await assertFails(mine(fan(), "u-both@x.com")); // not signed in
+  await assertFails(getDocs(collectionGroup(me, "members"))); // no unfiltered listing
+  await assertFails(getDocs(collectionGroup(as(ids.adminA, "u-admin-a@x.com"), "members"))); // not even a band admin
+  await assertFails(getDocs(collectionGroup(as(ids.platform, "ops@bandmate.app"), "members"))); // even the operator uses the per-band lists, not this lookup
 });

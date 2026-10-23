@@ -4,6 +4,8 @@ import { Link, NavLink, Navigate } from "../../lib/nav";
 import { signOut } from "firebase/auth";
 import { auth } from "../../firebase";
 import { isStaff, useAuth } from "../../state/auth";
+import { useT, type Key } from "../../i18n";
+import LangSwitch from "../../components/LangSwitch";
 import { BandDataProvider, useBand } from "../../state/band";
 import { useSettings } from "../../state/settings";
 import { useToast } from "../../state/toast";
@@ -20,8 +22,9 @@ import Users from "./Users";
 import VerifyEmail from "../VerifyEmail";
 
 export default function BandApp() {
+  const tt = useT();
   const { user, profile, ready } = useAuth();
-  if (!ready) return <main className="page"><div className="wrap"><Loading text="Signing in…" /></div></main>;
+  if (!ready) return <main className="page"><div className="wrap"><Loading text={tt("common.signingIn")} /></div></main>;
   if (!user) return <Navigate to="/login" replace />;
   if (!user.emailVerified) return <VerifyEmail />;
   if (!profile || !isStaff(profile.role)) return <Waiting />;
@@ -33,38 +36,37 @@ export default function BandApp() {
 }
 
 function Waiting() {
+  const t = useT();
   const { profile, user } = useAuth();
   const disabled = profile?.role === "disabled";
   return (
     <main className="page auth">
       <div className="authcard">
-        <h1>{disabled ? "Account disabled" : "Waiting for approval"}</h1>
+        <div className="card-top"><span /><LangSwitch /></div>
+        <h1>{disabled ? t("wait.disabledTitle") : t("wait.title")}</h1>
         <p className="note">
-          {disabled
-            ? "The admin has switched off this account. Ask them if you think this is a mistake."
-            : !profile
-            ? "We couldn't load your account. Check your connection and reload the page."
-            : `You're signed in as ${user?.email}. The admin needs to approve you as a BandMate before you can open the merch desk. This page opens the desk by itself once you're approved.`}
+          {disabled ? t("wait.disabledText") : !profile ? t("wait.noProfile") : t("wait.text", { email: user?.email ?? "" })}
         </p>
         <div className="stack-sm">
-          <Link className="btn ghost block" to="/">See the fan page</Link>
-          <button className="btn ghost block" onClick={() => signOut(auth)}>Sign out</button>
+          <Link className="btn ghost block" to="/">{t("verify.fanPage")}</Link>
+          <button className="btn ghost block" onClick={() => signOut(auth)}>{t("common.signOut")}</button>
         </div>
       </div>
     </main>
   );
 }
 
-const TABS = [
-  { to: "/band", label: "Sell", end: true, icon: <path d="M3 7h18l-2 12H5zM8 7a4 4 0 0 1 8 0" /> },
-  { to: "/band/stock", label: "Stock", icon: <path d="M3 8l9-5 9 5v8l-9 5-9-5zM3 8l9 5 9-5M12 13v8" /> },
-  { to: "/band/bundles", label: "Bundles", icon: <path d="M3 8h18v13H3zM3 12h18M12 8v13M12 8c-2-4-6-4-6-1s4 1 6 1c2 0 6 2 6-1s-4-3-6 1" /> },
-  { to: "/band/sales", label: "Sales", icon: <path d="M4 20V10M10 20V4M16 20v-7M22 20H2" /> },
-  { to: "/band/settings", label: "Settings", icon: <path d="M4 6h10M18 6h2M4 12h4M12 12h8M4 18h12M20 18h0M14 4v4M8 10v4M16 16v4" /> },
+const TABS: { to: string; label: Key; end?: boolean; icon: JSX.Element }[] = [
+  { to: "/band", label: "tab.sell", end: true, icon: <path d="M3 7h18l-2 12H5zM8 7a4 4 0 0 1 8 0" /> },
+  { to: "/band/stock", label: "tab.stock", icon: <path d="M3 8l9-5 9 5v8l-9 5-9-5zM3 8l9 5 9-5M12 13v8" /> },
+  { to: "/band/bundles", label: "tab.bundles", icon: <path d="M3 8h18v13H3zM3 12h18M12 8v13M12 8c-2-4-6-4-6-1s4 1 6 1c2 0 6 2 6-1s-4-3-6 1" /> },
+  { to: "/band/sales", label: "tab.sales", icon: <path d="M4 20V10M10 20V4M16 20v-7M22 20H2" /> },
+  { to: "/band/settings", label: "tab.settings", icon: <path d="M4 6h10M18 6h2M4 12h4M12 12h8M4 18h12M20 18h0M14 4v4M8 10v4M16 16v4" /> },
 ];
-const USERS_TAB = { to: "/band/users", label: "People", icon: <path d="M9 11a4 4 0 1 0 0-8 4 4 0 0 0 0 8zM2 21a7 7 0 0 1 14 0M16 3.5a4 4 0 0 1 0 7M18 14a6 6 0 0 1 4 7" /> };
+const USERS_TAB: (typeof TABS)[number] = { to: "/band/users", label: "tab.people", icon: <path d="M9 11a4 4 0 1 0 0-8 4 4 0 0 0 0 8zM2 21a7 7 0 0 1 14 0M16 3.5a4 4 0 0 1 0 7M18 14a6 6 0 0 1 4 7" /> };
 
 function Layout() {
+  const t = useT();
   const { profile } = useAuth();
   const { settings } = useSettings();
   const { band, ready, users } = useBand();
@@ -84,8 +86,9 @@ function Layout() {
           </Link>
           <button className="gig" onClick={() => setGigOpen(true)}>
             <span className="dot" />
-            <span>{band.gig ? <b>{band.gig}</b> : "Set tonight's gig"}</span>
+            <span>{band.gig ? <b>{band.gig}</b> : t("gig.set")}</span>
           </button>
+          <LangSwitch />
         </div>
       </header>
       <main className="page with-tabs">
@@ -105,15 +108,15 @@ function Layout() {
           )}
         </div>
       </main>
-      <nav className="tabs" aria-label="Sections">
+      <nav className="tabs" aria-label={t("tab.aria")}>
         <div className="tabs-in" style={{ gridTemplateColumns: `repeat(${tabs.length}, 1fr)` }}>
-          {tabs.map((t) => (
-            <NavLink key={t.to} to={t.to} end={"end" in t} className="tab">
+          {tabs.map((tab) => (
+            <NavLink key={tab.to} to={tab.to} end={!!tab.end} className="tab">
               <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-                {t.icon}
+                {tab.icon}
               </svg>
-              {t.label}
-              {t === USERS_TAB && pendingCount > 0 && <span className="tab-badge">{pendingCount}</span>}
+              {t(tab.label)}
+              {tab === USERS_TAB && pendingCount > 0 && <span className="tab-badge">{pendingCount}</span>}
             </NavLink>
           ))}
         </div>
@@ -124,6 +127,7 @@ function Layout() {
 }
 
 function GigSheet({ onClose }: { onClose: () => void }) {
+  const t = useT();
   const { band, sales } = useBand();
   const toast = useToast();
   const [gig, setGig] = useState(band.gig);
@@ -131,16 +135,16 @@ function GigSheet({ onClose }: { onClose: () => void }) {
   const submit = async (e: FormEvent) => {
     e.preventDefault();
     saveDoc("settings/band", { gig: gig.trim() }).catch((x) => toast(errorText(x)));
-    toast(gig.trim() ? `Selling at ${gig.trim()}` : "Gig cleared");
+    toast(gig.trim() ? t("gig.selling", { gig: gig.trim() }) : t("gig.cleared"));
     onClose();
   };
   return (
-    <Sheet title="Tonight's gig" onClose={onClose}>
+    <Sheet title={t("gig.title")} onClose={onClose}>
       <form className="stack" onSubmit={submit}>
         <div className="field">
-          <label htmlFor="gName">Where are you playing?</label>
-          <input id="gName" autoFocus value={gig} onChange={(e) => setGig(e.target.value)} placeholder="Košice, Collosseum · 24 Oct" />
-          <span className="hint">Every sale is tagged with this, so Sales shows takings per show.</span>
+          <label htmlFor="gName">{t("gig.where")}</label>
+          <input id="gName" autoFocus value={gig} onChange={(e) => setGig(e.target.value)} placeholder={t("gig.ph")} />
+          <span className="hint">{t("gig.hint")}</span>
         </div>
         {recent.length > 0 && (
           <div className="sizes">
@@ -151,7 +155,7 @@ function GigSheet({ onClose }: { onClose: () => void }) {
             ))}
           </div>
         )}
-        <button className="btn primary block">Start selling here</button>
+        <button className="btn primary block">{t("gig.start")}</button>
       </form>
     </Sheet>
   );

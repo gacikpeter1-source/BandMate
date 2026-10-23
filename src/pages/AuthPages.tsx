@@ -9,8 +9,11 @@ import { useSettings } from "../state/settings";
 import { LogoBackdrop } from "../components/brand";
 import { platformAdminUrl } from "../lib/host";
 import { useTenant } from "../state/tenant";
+import { useT } from "../i18n";
+import LangSwitch from "../components/LangSwitch";
 
 function Shell({ title, children }: { title: string; children: ReactNode }) {
+  const t = useT();
   const { settings } = useSettings();
   const { bandId } = useTenant();
   return (
@@ -18,9 +21,12 @@ function Shell({ title, children }: { title: string; children: ReactNode }) {
       <LogoBackdrop settings={settings} />
       <main className="page auth">
         <div className="authcard">
-          <Link to="/" className="back">
-            ← {bandId ? `${settings.bandName || "Merch"} shop` : "BandMate"}
-          </Link>
+          <div className="card-top">
+            <Link to="/" className="back">
+              {bandId ? t("auth.backShop", { name: settings.bandName || "Merch" }) : "← BandMate"}
+            </Link>
+            <LangSwitch />
+          </div>
           <h1>{title}</h1>
           {children}
         </div>
@@ -32,6 +38,7 @@ function Shell({ title, children }: { title: string; children: ReactNode }) {
 /** band = a band's own login; operator = BandMate admin (/platform/login);
  *  customer = someone registering a band at bandmate.shop (/start/login). */
 export function Login({ variant = "band" }: { variant?: "band" | "operator" | "customer" }) {
+  const t = useT();
   const nav = useNavigate();
   const after = variant === "operator" ? "/platform" : variant === "customer" ? "/start" : "/band";
   const { user, ready } = useAuth();
@@ -57,51 +64,51 @@ export function Login({ variant = "band" }: { variant?: "band" | "operator" | "c
   };
 
   return (
-    <Shell title={variant === "operator" ? "BandMate admin" : variant === "customer" ? "Sign in" : "Band login"}>
+    <Shell title={variant === "operator" ? t("login.titleOperator") : variant === "customer" ? t("login.titleCustomer") : t("login.titleBand")}>
       <form onSubmit={submit} className="stack">
         <div className="field">
-          <label htmlFor="lEmail">Email</label>
+          <label htmlFor="lEmail">{t("login.email")}</label>
           <input id="lEmail" type="email" autoComplete="email" required value={email} onChange={(e) => setEmail(e.target.value)} />
         </div>
         <div className="field">
-          <label htmlFor="lPw">Password</label>
+          <label htmlFor="lPw">{t("login.password")}</label>
           <input id="lPw" type="password" autoComplete="current-password" required value={pw} onChange={(e) => setPw(e.target.value)} />
         </div>
         {err && <p className="hint err">{err}</p>}
         {info && <p className="hint">{info}</p>}
         <button className="btn primary block" disabled={busy}>
-          {busy ? "Signing in…" : "Sign in"}
+          {busy ? t("common.signingIn") : t("login.signIn")}
         </button>
         <button
           type="button"
           className="linkbtn"
           onClick={async () => {
-            if (!email.trim()) return setErr("Type your email first, then tap Forgot password.");
+            if (!email.trim()) return setErr(t("login.typeEmailFirst"));
             try {
               await sendPasswordResetEmail(auth, email.trim());
               setErr("");
-              setInfo("If that account exists, a reset link is on its way to your inbox.");
+              setInfo(t("login.resetSent"));
             } catch (x) {
               setErr(errorText(x));
             }
           }}
         >
-          Forgot password?
+          {t("login.forgot")}
         </button>
       </form>
       {variant === "customer" && (
         <p className="note center">
-          New here? <Link to="/start/register">Create an account</Link>
+          {t("login.newHere")} <Link to="/start/register">{t("login.createAccount")}</Link>
         </p>
       )}
       {variant === "band" && (
         <>
           <p className="note center">
-            New band member? <Link to="/register">Create an account</Link>
+            {t("login.newMember")} <Link to="/register">{t("login.createAccount")}</Link>
           </p>
           {/* Only here, on the login screen: never shown once someone is signed in. */}
           <p className="note center">
-            <a href={platformAdminUrl()}>BandMate admin</a>
+            <a href={platformAdminUrl()}>{t("login.adminLink")}</a>
           </p>
         </>
       )}
@@ -111,6 +118,7 @@ export function Login({ variant = "band" }: { variant?: "band" | "operator" | "c
 
 /** band = joining a band's team (waits for that band's admin); customer = account for registering a band. */
 export function Register({ variant = "band" }: { variant?: "band" | "customer" }) {
+  const t = useT();
   const nav = useNavigate();
   const after = variant === "customer" ? "/start" : "/band";
   const { user, ready } = useAuth();
@@ -123,7 +131,7 @@ export function Register({ variant = "band" }: { variant?: "band" | "customer" }
 
   const submit = async (e: FormEvent) => {
     e.preventDefault();
-    if (pw.length < 8) return setErr("Use a password of at least 8 characters.");
+    if (pw.length < 8) return setErr(t("err.weakPassword"));
     setBusy(true);
     setErr("");
     try {
@@ -140,33 +148,31 @@ export function Register({ variant = "band" }: { variant?: "band" | "customer" }
   };
 
   return (
-    <Shell title={variant === "customer" ? "Create your account" : "Join the band desk"}>
+    <Shell title={variant === "customer" ? t("reg.titleCustomer") : t("reg.titleBand")}>
       <p className="note">
-        {variant === "customer"
-          ? "We email you a link to confirm your address. Then you can register your band."
-          : "We email you a link to confirm your address. After that, the admin approves your account and makes you a BandMate."}
+        {variant === "customer" ? t("reg.noteCustomer") : t("reg.noteBand")}
       </p>
       <form onSubmit={submit} className="stack">
         <div className="field">
-          <label htmlFor="rName">Your name</label>
-          <input id="rName" required autoComplete="name" value={name} onChange={(e) => setName(e.target.value)} placeholder="Name the band knows you by" />
+          <label htmlFor="rName">{t("reg.yourName")}</label>
+          <input id="rName" required autoComplete="name" value={name} onChange={(e) => setName(e.target.value)} placeholder={t("reg.namePh")} />
         </div>
         <div className="field">
-          <label htmlFor="rEmail">Email</label>
+          <label htmlFor="rEmail">{t("login.email")}</label>
           <input id="rEmail" type="email" required autoComplete="email" value={email} onChange={(e) => setEmail(e.target.value)} />
         </div>
         <div className="field">
-          <label htmlFor="rPw">Password</label>
+          <label htmlFor="rPw">{t("login.password")}</label>
           <input id="rPw" type="password" required autoComplete="new-password" minLength={8} value={pw} onChange={(e) => setPw(e.target.value)} />
-          <span className="hint">At least 8 characters.</span>
+          <span className="hint">{t("reg.pwHint")}</span>
         </div>
         {err && <p className="hint err">{err}</p>}
         <button className="btn primary block" disabled={busy}>
-          {busy ? "Creating account…" : "Create account"}
+          {busy ? t("reg.creating") : t("reg.create")}
         </button>
       </form>
       <p className="note center">
-        Already have an account? <Link to={variant === "customer" ? "/start/login" : "/login"}>Sign in</Link>
+        {t("reg.haveAccount")} <Link to={variant === "customer" ? "/start/login" : "/login"}>{t("login.signIn")}</Link>
       </p>
     </Shell>
   );

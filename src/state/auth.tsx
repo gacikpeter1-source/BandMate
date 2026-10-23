@@ -3,6 +3,7 @@ import { onAuthStateChanged, type User } from "firebase/auth";
 import { doc, getDoc, onSnapshot, setDoc } from "firebase/firestore";
 import { auth, db } from "../firebase";
 import type { Role, UserProfile } from "../types";
+import { tr } from "../i18n";
 import { useTenant } from "./tenant";
 
 interface AuthState {
@@ -106,9 +107,4 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
 export const useAuth = () => useContext(Ctx);
 export const isStaff = (r?: Role) => r === "bandmate" || r === "admin";
-export const ROLE_LABEL: Record<Role, string> = {
-  pending: "Waiting for approval",
-  bandmate: "BandMate",
-  admin: "Admin",
-  disabled: "Disabled",
-};
+export const roleLabel = (r: Role) => tr(`role.${r}` as const);

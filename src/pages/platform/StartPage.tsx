@@ -6,29 +6,35 @@ import { PLATFORM_HOST, bandUrl } from "../../lib/host";
 import { useLiveDoc } from "../../lib/live";
 import { cancelBandRequest, fileBandRequest, isBandIdTaken, requestDoc, slugFormatProblem, slugify, type SlugProblem } from "../../lib/platform";
 import { useAuth } from "../../state/auth";
+import { useT, type Key } from "../../i18n";
+import LangSwitch from "../../components/LangSwitch";
 import { Loading } from "../../components/ui";
 import VerifyEmail from "../VerifyEmail";
 import type { BandRequest } from "../../types";
 
 const card = (children: React.ReactNode) => (
   <main className="page auth">
-    <div className="authcard">{children}</div>
+    <div className="authcard">
+      <div className="card-top"><span /><LangSwitch /></div>
+      {children}
+    </div>
   </main>
 );
 
 /** /start: register your band. Sign in (or create an account), confirm the email, file the request. */
 export default function StartPage() {
+  const t = useT();
   const { user, ready } = useAuth();
   if (!ready) return <main className="page"><div className="wrap"><Loading /></div></main>;
   if (!user)
     return card(
       <>
         <Link to="/" className="back">← BandMate</Link>
-        <h1>Register your band</h1>
-        <p className="note">Create an account (we email you a link to confirm your address), then tell us your band's name and the address you want, for example helloween.{PLATFORM_HOST}.</p>
+        <h1>{t("start.title")}</h1>
+        <p className="note">{t("start.intro", { host: PLATFORM_HOST })}</p>
         <div className="stack-sm">
-          <Link className="btn primary block" to="/start/register">Create an account</Link>
-          <Link className="btn ghost block" to="/start/login">I already have an account</Link>
+          <Link className="btn primary block" to="/start/register">{t("start.createAccount")}</Link>
+          <Link className="btn ghost block" to="/start/login">{t("start.haveAccount")}</Link>
         </div>
       </>
     );
@@ -43,14 +49,15 @@ function Founder({ user }: { user: User }) {
   return <RequestForm user={user} />;
 }
 
-const PROBLEM: Record<Exclude<SlugProblem, null>, string> = {
-  short: "At least 3 characters.",
-  bad: "Use only lowercase letters, digits and single dashes.",
-  reserved: "That name is reserved. Pick another.",
-  taken: "That address is already taken. Pick another.",
+const PROBLEM: Record<Exclude<SlugProblem, null>, Key> = {
+  short: "slug.short",
+  bad: "slug.bad",
+  reserved: "slug.reserved",
+  taken: "slug.taken",
 };
 
 function RequestForm({ user }: { user: User }) {
+  const t = useT();
   const [person, setPerson] = useState(user.displayName || "");
   const [bandName, setBandName] = useState("");
   const [address, setAddress] = useState("");
@@ -101,7 +108,7 @@ function RequestForm({ user }: { user: User }) {
       await fileBandRequest({ uid: user.uid, email: (user.email || "").toLowerCase(), displayName: person.trim(), bandName, bandId: address, domain });
     } catch (x) {
       const code = (x as { code?: string })?.code;
-      setErr(code === "permission-denied" ? "That address was just taken or isn't allowed. Pick another one." : "Couldn't send the request. Check your connection and try again.");
+      setErr(code === "permission-denied" ? t("start.errDenied") : t("start.errGeneric"));
       setBusy(false);
     }
   };
@@ -109,44 +116,48 @@ function RequestForm({ user }: { user: User }) {
   return (
     <main className="page auth">
       <div className="authcard">
-        <Link to="/" className="back">← BandMate</Link>
-        <h1>Register your band</h1>
+        <div className="card-top">
+          <Link to="/" className="back">← BandMate</Link>
+          <LangSwitch />
+        </div>
+        <h1>{t("start.title")}</h1>
         <form className="stack" onSubmit={submit}>
           <div className="field">
-            <label htmlFor="rqPerson">Your name</label>
+            <label htmlFor="rqPerson">{t("start.yourName")}</label>
             <input id="rqPerson" required autoComplete="name" value={person} onChange={(e) => setPerson(e.target.value)} />
           </div>
           <div className="field">
-            <label htmlFor="rqBand">Band name</label>
+            <label htmlFor="rqBand">{t("start.bandName")}</label>
             <input id="rqBand" required maxLength={60} value={bandName} onChange={(e) => setBandName(e.target.value)} placeholder="Helloween" />
           </div>
           <div className="field">
-            <label htmlFor="rqAddr">Your address</label>
+            <label htmlFor="rqAddr">{t("start.address")}</label>
             <div className="addr">
               <input id="rqAddr" value={address} autoCapitalize="none" autoCorrect="off" spellCheck={false} onChange={(e) => { setEdited(true); setAddress(e.target.value.toLowerCase()); }} placeholder="helloween" />
               <span>.{PLATFORM_HOST}</span>
             </div>
-            {problem ? <span className="hint err">{PROBLEM[problem]}</span> : address ? <span className="hint">{checking ? "Checking…" : `Free: ${address}.${PLATFORM_HOST}`}</span> : <span className="hint">Letters, digits and dashes. This is where fans find your merch.</span>}
+            {problem ? <span className="hint err">{t(PROBLEM[problem])}</span> : address ? <span className="hint">{checking ? t("start.checking") : t("start.addrFree", { addr: `${address}.${PLATFORM_HOST}` })}</span> : <span className="hint">{t("start.addrHint")}</span>}
           </div>
           <div className="field">
-            <label htmlFor="rqDom">Your own domain (optional)</label>
-            <input id="rqDom" value={domain} autoCapitalize="none" autoCorrect="off" spellCheck={false} onChange={(e) => setDomain(e.target.value)} placeholder="merch.yourband.com" />
-            <span className="hint">If you already own one, we can connect it too.</span>
+            <label htmlFor="rqDom">{t("start.ownDomain")}</label>
+            <input id="rqDom" value={domain} autoCapitalize="none" autoCorrect="off" spellCheck={false} onChange={(e) => setDomain(e.target.value)} placeholder={t("start.domainPh")} />
+            <span className="hint">{t("start.ownDomainHint")}</span>
           </div>
           <label className="check">
             <input type="checkbox" checked={agree} onChange={(e) => setAgree(e.target.checked)} />
-            <span>I have read the <Link to="/terms" target="_blank" rel="noopener">terms and rules</Link> and agree with them.</span>
+            <span>{t("start.agreeBefore")}<Link to="/terms" target="_blank" rel="noopener">{t("start.terms")}</Link>{t("start.agreeAfter")}</span>
           </label>
           {err && <p className="hint err">{err}</p>}
-          <button className="btn primary block" disabled={!ok || busy}>{busy ? "Sending…" : "Send request"}</button>
+          <button className="btn primary block" disabled={!ok || busy}>{busy ? t("start.sending") : t("start.send")}</button>
         </form>
-        <button className="btn ghost block" onClick={() => signOut(auth)}>Sign out</button>
+        <button className="btn ghost block" onClick={() => signOut(auth)}>{t("common.signOut")}</button>
       </div>
     </main>
   );
 }
 
 function Status({ req, uid }: { req: BandRequest; uid: string }) {
+  const t = useT();
   const [busy, setBusy] = useState(false);
   const url = bandUrl(req.bandId);
   const withdraw = () => {
@@ -156,33 +167,33 @@ function Status({ req, uid }: { req: BandRequest; uid: string }) {
   if (req.status === "approved")
     return card(
       <>
-        <h1>Your band is ready</h1>
-        <p className="note"><b>{req.bandName}</b> now has its own page. Open it and sign in there with the same email and password. Each address has its own sign-in.</p>
+        <h1>{t("start.readyTitle")}</h1>
+        <p className="note">{t("start.readyText", { name: req.bandName })}</p>
         <div className="stack-sm">
-          <a className="btn primary block" href={bandUrl(req.bandId, "/login")}>Sign in to your band desk</a>
-          <a className="btn ghost block" href={url}>See your merch page</a>
-          <button className="btn ghost block" onClick={() => signOut(auth)}>Sign out</button>
+          <a className="btn primary block" href={bandUrl(req.bandId, "/login")}>{t("start.signInBand")}</a>
+          <a className="btn ghost block" href={url}>{t("start.seePage")}</a>
+          <button className="btn ghost block" onClick={() => signOut(auth)}>{t("common.signOut")}</button>
         </div>
       </>
     );
   if (req.status === "rejected")
     return card(
       <>
-        <h1>Request not approved</h1>
-        <p className="note">We couldn't approve the request for <b>{req.bandName}</b>. You can send a new one with different details.</p>
+        <h1>{t("start.rejTitle")}</h1>
+        <p className="note">{t("start.rejText", { name: req.bandName })}</p>
         <div className="stack-sm">
-          <button className="btn primary block" onClick={withdraw} disabled={busy}>Start a new request</button>
-          <button className="btn ghost block" onClick={() => signOut(auth)}>Sign out</button>
+          <button className="btn primary block" onClick={withdraw} disabled={busy}>{t("start.newRequest")}</button>
+          <button className="btn ghost block" onClick={() => signOut(auth)}>{t("common.signOut")}</button>
         </div>
       </>
     );
   return card(
     <>
-      <h1>Request received</h1>
-      <p className="note">We're looking at it. Once it's approved, <b>{req.bandName}</b> will live at <b>{req.bandId}.{PLATFORM_HOST}</b>. Come back to this page to see the result.</p>
+      <h1>{t("start.recvTitle")}</h1>
+      <p className="note">{t("start.recvText", { name: req.bandName, addr: `${req.bandId}.${PLATFORM_HOST}` })}</p>
       <div className="stack-sm">
-        <button className="btn ghost block" onClick={withdraw} disabled={busy}>Withdraw the request</button>
-        <button className="btn ghost block" onClick={() => signOut(auth)}>Sign out</button>
+        <button className="btn ghost block" onClick={withdraw} disabled={busy}>{t("start.withdraw")}</button>
+        <button className="btn ghost block" onClick={() => signOut(auth)}>{t("common.signOut")}</button>
       </div>
     </>
   );

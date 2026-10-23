@@ -11,7 +11,8 @@
     "test:rules": "firebase emulators:exec --only firestore,storage --project demo-bandmate \"node --test tests/rules.test.mjs\"",
     "create-band": "node scripts/create-band.mjs",
     "create-platform-admin": "node scripts/create-platform-admin.mjs",
-    "migrate": "node scripts/migrate-to-multitenant.mjs"
+    "migrate": "node scripts/migrate-to-multitenant.mjs",
+    "test:i18n": "node --experimental-strip-types --test tests/i18n.test.mjs"
   },
   "dependencies": {
     "firebase": "^10.14.1",

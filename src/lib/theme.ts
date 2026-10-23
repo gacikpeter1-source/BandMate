@@ -1,12 +1,13 @@
 import type { Theme } from "../types";
+import { tr, type Key } from "../i18n";
 
-export const PRESETS: Record<string, { label: string; theme: Theme }> = {
-  stage: { label: "Stage", theme: { primary: "#FF5A1F", bg: "#121311", surface: "#1D201C", text: "#F1F2EE" } },
-  metal: { label: "Metal", theme: { primary: "#D01C2B", bg: "#090909", surface: "#171717", text: "#E9E9E9" } },
-  punk: { label: "Punk", theme: { primary: "#E4006D", bg: "#FFEF3A", surface: "#FFFFFF", text: "#111111" } },
-  indie: { label: "Indie", theme: { primary: "#2F55A4", bg: "#EEE9DF", surface: "#FFFFFF", text: "#1D2130" } },
-  folk: { label: "Folk", theme: { primary: "#5E7F2E", bg: "#ECE4D2", surface: "#FAF6EC", text: "#2A291F" } },
-  synth: { label: "Synthwave", theme: { primary: "#14D2FF", bg: "#160B2E", surface: "#241543", text: "#F3EEFF" } },
+export const PRESETS: Record<string, { label: Key; theme: Theme }> = {
+  stage: { label: "theme.stage", theme: { primary: "#FF5A1F", bg: "#121311", surface: "#1D201C", text: "#F1F2EE" } },
+  metal: { label: "theme.metal", theme: { primary: "#D01C2B", bg: "#090909", surface: "#171717", text: "#E9E9E9" } },
+  punk: { label: "theme.punk", theme: { primary: "#E4006D", bg: "#FFEF3A", surface: "#FFFFFF", text: "#111111" } },
+  indie: { label: "theme.indie", theme: { primary: "#2F55A4", bg: "#EEE9DF", surface: "#FFFFFF", text: "#1D2130" } },
+  folk: { label: "theme.folk", theme: { primary: "#5E7F2E", bg: "#ECE4D2", surface: "#FAF6EC", text: "#2A291F" } },
+  synth: { label: "theme.synth", theme: { primary: "#14D2FF", bg: "#160B2E", surface: "#241543", text: "#F3EEFF" } },
 };
 
 function rgb(hex: string): [number, number, number] {
@@ -46,7 +47,7 @@ export function applyTheme(t: Theme) {
 /** Warn when the band's colours make text hard to read. */
 export function themeWarnings(t: Theme) {
   const w: string[] = [];
-  if (contrast(t.text, t.bg) < 4.5) w.push("Text is hard to read on the background.");
-  if (contrast(t.text, t.surface) < 4.5) w.push("Text is hard to read on cards.");
+  if (contrast(t.text, t.bg) < 4.5) w.push(tr("theme.warnBg"));
+  if (contrast(t.text, t.surface) < 4.5) w.push(tr("theme.warnCards"));
   return w;
 }

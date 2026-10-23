@@ -2,6 +2,7 @@
 import { collection, doc, getDoc, runTransaction, serverTimestamp, setDoc, updateDoc, deleteDoc } from "firebase/firestore";
 import { db } from "../firebase";
 import { RESERVED_BAND_IDS } from "./host";
+import { tr } from "../i18n";
 import { DEFAULT_SETTINGS } from "../state/settings";
 import type { BandRequest } from "../types";
 
@@ -60,12 +61,12 @@ export const cancelBandRequest = (uid: string) => deleteDoc(requestDoc(uid));
 export function approveBandRequest(r: BandRequest) {
   return runTransaction(db, async (tx) => {
     const bandRef = doc(db, "bands", r.bandId);
-    if ((await tx.get(bandRef)).exists()) throw new Error(`The address "${r.bandId}" is already taken by another band.`);
+    if ((await tx.get(bandRef)).exists()) throw new Error(tr("con.errTaken", { id: r.bandId }));
     let domainRef = null;
     if (r.domain) {
       domainRef = doc(db, "domains", r.domain);
       const existing = await tx.get(domainRef);
-      if (existing.exists() && existing.data().bandId !== r.bandId) throw new Error(`${r.domain} already opens another band.`);
+      if (existing.exists() && existing.data().bandId !== r.bandId) throw new Error(tr("con.errDomain", { d: r.domain }));
     }
     tx.set(bandRef, { name: r.bandName, status: "active", createdAt: Date.now() });
     tx.set(doc(db, "bands", r.bandId, "settings", "public"), { ...DEFAULT_SETTINGS, bandName: r.bandName });

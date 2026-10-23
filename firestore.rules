@@ -38,6 +38,12 @@ service cloud.firestore {
       allow list, write: if platformAdmin();
     }
 
+    // "Which bands am I in?": one collection-group query by the signed-in person's own email.
+    // Only returns member documents carrying their own verified email.
+    match /{path=**}/members/{memberId} {
+      allow read: if verified() && resource.data.email == request.auth.token.email;
+    }
+
     // A founder's request for a new band space: one per verified account (doc id = their uid).
     // Only the operator can approve it (which creates the band); the founder can read and withdraw it.
     match /bandRequests/{uid} {

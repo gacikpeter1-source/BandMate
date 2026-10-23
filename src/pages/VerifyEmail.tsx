@@ -5,12 +5,17 @@ import { auth } from "../firebase";
 import { errorText } from "../lib/format";
 import { sendVerification } from "../lib/verify";
 import { useAuth } from "../state/auth";
+import { useTenant } from "../state/tenant";
+import { useT } from "../i18n";
+import LangSwitch from "../components/LangSwitch";
 
 const RESEND_SECONDS = 60;
 const POLL_MS = 4000;
 
 /** Shown to anyone signed in whose email address is not confirmed yet. */
 export default function VerifyEmail() {
+  const t = useT();
+  const { bandId } = useTenant();
   const { user, recheck } = useAuth();
   const [wait, setWait] = useState(0);
   const [busy, setBusy] = useState(false);
@@ -43,7 +48,7 @@ export default function VerifyEmail() {
     setMsg("");
     try {
       await sendVerification(auth.currentUser);
-      setMsg("Sent. Check your inbox and your spam folder.");
+      setMsg(t("verify.sentOk"));
       setWait(RESEND_SECONDS);
     } catch (x) {
       setErr(errorText(x));
@@ -58,7 +63,7 @@ export default function VerifyEmail() {
     setMsg("");
     try {
       await recheck();
-      if (!auth.currentUser?.emailVerified) setMsg("Not confirmed yet. Open the link in the email first.");
+      if (!auth.currentUser?.emailVerified) setMsg(t("verify.notYet"));
     } catch (x) {
       setErr(errorText(x));
     } finally {
@@ -69,21 +74,22 @@ export default function VerifyEmail() {
   return (
     <main className="page auth">
       <div className="authcard">
-        <h1>Confirm your email</h1>
+        <div className="card-top"><span /><LangSwitch /></div>
+        <h1>{t("verify.title")}</h1>
         <p className="note">
-          We sent a link to <b>{user?.email}</b>. Open it to confirm this address. You can't use the app until you do. This page continues by itself once you have.
+          {t("verify.sent")} <b>{user?.email}</b>. {t("verify.open")}
         </p>
         {msg && <p className="hint">{msg}</p>}
         {err && <p className="hint err">{err}</p>}
         <div className="stack-sm">
           <button className="btn primary block" onClick={check} disabled={busy}>
-            I've confirmed it
+            {t("verify.confirmed")}
           </button>
           <button className="btn ghost block" onClick={resend} disabled={busy || wait > 0}>
-            {wait > 0 ? `Send the email again (${wait}s)` : "Send the email again"}
+            {wait > 0 ? t("verify.resendWait", { s: wait }) : t("verify.resend")}
           </button>
-          <Link className="btn ghost block" to="/">See the fan page</Link>
-          <button className="btn ghost block" onClick={() => signOut(auth)}>Sign out</button>
+          {bandId && <Link className="btn ghost block" to="/">{t("verify.fanPage")}</Link>}
+          <button className="btn ghost block" onClick={() => signOut(auth)}>{t("common.signOut")}</button>
         </div>
       </div>
     </main>
