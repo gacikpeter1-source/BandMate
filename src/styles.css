@@ -288,6 +288,7 @@ input[type="range"] { width: 100%; accent-color: var(--primary); }
 .toggle input:focus-visible + i { outline: 3px solid var(--primary); outline-offset: 2px; }
 
 /* ---------- band registration ---------- */
+.sep { border: 0; border-top: 1px solid var(--line); margin: 6px 0; width: 100%; }
 .addr { display: flex; align-items: stretch; min-width: 0; }
 .addr input { border-top-right-radius: 0; border-bottom-right-radius: 0; min-width: 0; }
 .addr span { display: flex; align-items: center; padding: 0 12px; background: var(--sunk); border: 1.5px solid var(--line); border-left: 0; border-radius: 0 8px 8px 0; color: var(--muted); font-size: .9rem; white-space: nowrap; }
