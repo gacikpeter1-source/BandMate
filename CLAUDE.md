@@ -96,7 +96,7 @@ Accounts made by the scripts are marked verified. Unverified Auth accounts stay 
 - `settings/public`: bandName, tagline, currency, preset, theme{primary,bg,surface,text}, logoUrl, logoPath, logoOpacity, logoInHeader, topBar{enabled,email,links[{type,url}]}.
 - `settings/band`: { gig } — staff only.
 - Band record also has `plan` ("free"|"paid", missing = free) and `extraPacks` (+150 MB each) — operator-written only.
-- `settings/usage`: { items, bytes, members } — running totals the limits are checked against (members = people + open invitations).
+- `settings/usage`: { items, bytes, members, limitBytes } — running totals the limits are checked against (members = people + open invitations); `limitBytes` is the picture allowance, operator-written only.
 - `invites/{email}`: email, role ("bandmate"), invitedBy, createdAt. Doc id = lowercase email. Admin-managed; the invitee can read/delete only their own.
 - Storage: `bands/{bandId}/qr|logo|photos/*` — public read, that band's staff (or operator) write, images < 5 MB.
   Photos are shrunk to 1400px WebP on the phone before upload (`src/lib/images.ts`); max 6 per product.
@@ -114,9 +114,15 @@ Accounts made by the scripts are marked verified. Unverified Auth accounts stay 
 - Enforcement: the app checks first (`assertItemRoom/assertSpaceRoom/assertUserRoom`, friendly message + "Extend?" button) and the rules
   enforce too: item create needs `getAfter(settings/usage).items <= max` (so item writes go in a batch with the counter,
   `createItems`/`deleteItem` in `lib/ops.ts`), invite create needs `members <= max`, a Storage upload needs
-  `usage.bytes + size <= max` (storage rules read Firestore), `settings/public` design fields (`theme, preset, logo*`) need Paid.
+  `usage.bytes + size <= usage.limitBytes` (storage rules read Firestore), `settings/public` design fields (`theme, preset, logo*`) need Paid.
   The counters are app-maintained, so this stops honest overuse, not a determined band; items and members self-correct
   (`state/band.tsx`, `pages/band/Users.tsx`); bytes need `node scripts/recount-usage.mjs <bandId>|--all --bucket <bucket>` after anything odd.
+- **Storage rules may read only ~2 Firestore documents per request in production, and the emulator does NOT enforce that** (a 3-document
+  version passed every test but returned 403 for real uploads). An ordinary member's upload reads exactly two: their membership and
+  `settings/usage`. So the picture allowance is copied into `settings/usage.limitBytes` (operator-written only: `setBandPlan`, approval,
+  `set-plan.mjs`, `recount-usage.mjs`; missing = free 50 MB). Never add a third `firestore.get/exists` to the member upload path
+  (band status, plan, ...). A paused band's staff can still upload pictures (they can write nothing else). Rules changes that touch
+  Storage must be checked against the real project after deploy, not only the emulator.
 - Over the limit (e.g. after a downgrade): all data is kept, only adding is blocked, with the "limit reached, Extend?" message.
 - "Extend?" opens the plan table; online payment doesn't exist yet, so it says to ask the BandMate admin (operator console).
 - Invites (`src/lib/invites.ts`, `pages/band/Accept.tsx`): admin adds an email -> invite doc + counter in one batch, then Firebase's
