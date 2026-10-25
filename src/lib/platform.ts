@@ -6,6 +6,7 @@ import { RESERVED_BAND_IDS } from "./host";
 import { tr } from "../i18n";
 import { DEFAULT_SETTINGS } from "../state/settings";
 import { activeBands, fetchMyBands } from "./memberships";
+import { limitsOf } from "./plans";
 import type { BandRequest } from "../types";
 
 export const bandsCol = () => collection(db, "bands");
@@ -74,7 +75,7 @@ export async function approveBandRequest(r: BandRequest) {
       if (existing.exists() && existing.data().bandId !== r.bandId) throw new Error(tr("con.errDomain", { d: r.domain }));
     }
     tx.set(bandRef, { name: r.bandName, status: "active", createdAt: Date.now(), plan: r.plan === "paid" ? "paid" : "free", extraPacks: 0 });
-    tx.set(doc(db, "bands", r.bandId, "settings", "usage"), { items: 0, bytes: 0, members: 1 });
+    tx.set(doc(db, "bands", r.bandId, "settings", "usage"), { items: 0, bytes: 0, members: 1, limitBytes: limitsOf({ plan: r.plan === "paid" ? "paid" : "free", extraPacks: 0 }).bytes });
     tx.set(doc(db, "bands", r.bandId, "settings", "public"), { ...DEFAULT_SETTINGS, bandName: r.bandName });
     tx.set(doc(db, "bands", r.bandId, "settings", "band"), { gig: "" });
     tx.set(doc(db, "bands", r.bandId, "members", r.uid), { email: r.email, displayName: r.displayName, role: "admin", createdAt: Date.now() });
@@ -86,8 +87,14 @@ export async function approveBandRequest(r: BandRequest) {
 export const rejectBandRequest = (uid: string) => updateDoc(requestDoc(uid), { status: "rejected", rejectedAt: Date.now() });
 
 /** Switch a band between Free and Paid and set how many extra-space packs it has (operator only). */
-export const setBandPlan = (bandId: string, plan: "free" | "paid", extraPacks: number) =>
-  updateDoc(doc(db, "bands", bandId), { plan, extraPacks: Math.max(0, Math.floor(extraPacks)) });
+export function setBandPlan(bandId: string, plan: "free" | "paid", extraPacks: number) {
+  const packs = Math.max(0, Math.floor(extraPacks));
+  const b = writeBatch(db);
+  b.update(doc(db, "bands", bandId), { plan, extraPacks: packs });
+  // storage.rules can only afford to read two documents per upload, so the picture allowance is copied here
+  b.set(doc(db, "bands", bandId, "settings", "usage"), { limitBytes: limitsOf({ plan, extraPacks: packs }).bytes }, { merge: true });
+  return b.commit();
+}
 
 export const setBandStatus = (bandId: string, status: "active" | "paused") => updateDoc(doc(db, "bands", bandId), { status });
 

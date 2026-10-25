@@ -153,11 +153,14 @@ service cloud.firestore {
       // How much of the plan is used: items, picture bytes, members + open invitations.
       match /settings/usage {
         allow read: if isStaff();
+        // limitBytes = this band's picture allowance, read by storage.rules. Only the operator may set it.
         allow create, update: if isStaff()
-          && request.resource.data.keys().hasOnly(['items', 'bytes', 'members'])
+          && request.resource.data.keys().hasOnly(['items', 'bytes', 'members', 'limitBytes'])
           && request.resource.data.get('items', 0) >= 0
           && request.resource.data.get('bytes', 0) >= 0
-          && request.resource.data.get('members', 0) >= 0;
+          && request.resource.data.get('members', 0) >= 0
+          && (platformAdmin()
+            || request.resource.data.get('limitBytes', null) == (resource == null ? null : resource.data.get('limitBytes', null)));
         allow delete: if platformAdmin();
       }
 

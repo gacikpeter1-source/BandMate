@@ -20,5 +20,7 @@ if (!snap.exists) {
 }
 const packs = flags.packs === undefined ? snap.data().extraPacks || 0 : Math.max(0, Math.floor(Number(flags.packs) || 0));
 await ref.update({ plan, extraPacks: packs });
+// storage.rules reads the picture allowance from settings/usage (it may only read two documents per upload)
+await db.doc(`bands/${bandId}/settings/usage`).set({ limitBytes: ((plan === "paid" ? 150 : 50) + packs * 150) * 1024 * 1024 }, { merge: true });
 console.log(`${bandId}: plan ${plan}, ${packs} extra space pack(s)`);
 process.exit(0);

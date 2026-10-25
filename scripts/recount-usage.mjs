@@ -22,7 +22,8 @@ for (const id of ids) {
   const count = async (sub) => (await db.collection(`bands/${id}/${sub}`).count().get()).data().count;
   const items = await count("items");
   const members = (await count("members")) + (await count("invites"));
-  const usage = { items, members };
+  const band = (await db.doc(`bands/${id}`).get()).data() || {};
+  const usage = { items, members, limitBytes: ((band.plan === "paid" ? 150 : 50) + (band.extraPacks || 0) * 150) * 1024 * 1024 };
   if (bucket) {
     const [files] = await bucket.getFiles({ prefix: `bands/${id}/` });
     usage.bytes = files.reduce((n, f) => n + Number(f.metadata.size || 0), 0);

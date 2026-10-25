@@ -9,29 +9,33 @@ service firebase.storage {
     function verified() {
       return request.auth != null && request.auth.token.email_verified == true;
     }
+    // Storage rules may read only a couple of Firestore documents per upload (Firebase's cross-service limit,
+    // which the emulator does not enforce, so tests can't catch going over it). An ordinary member's upload
+    // therefore reads exactly TWO: their membership and the band's settings/usage. Do not add a third lookup
+    // (band status, plan, ...) to this path; put what is needed into settings/usage instead.
     function isPlatform() {
       return verified() && firestore.exists(/databases/(default)/documents/platformAdmins/$(request.auth.uid));
     }
-    function isStaffOf(bandId) {
-      return verified() && (
-        isPlatform() || (
-          firestore.exists(/databases/(default)/documents/bands/$(bandId)/members/$(request.auth.uid))
-          && firestore.get(/databases/(default)/documents/bands/$(bandId)/members/$(request.auth.uid)).data.role in ['bandmate', 'admin']
-          && firestore.get(/databases/(default)/documents/bands/$(bandId)).data.status == 'active'
-        )
-      );
+    function memberPath(bandId) {
+      return /databases/(default)/documents/bands/$(bandId)/members/$(request.auth.uid);
+    }
+    function usagePath(bandId) {
+      return /databases/(default)/documents/bands/$(bandId)/settings/usage;
+    }
+    function isMemberOf(bandId) {
+      return verified()
+        && firestore.exists(memberPath(bandId))
+        && firestore.get(memberPath(bandId)).data.role in ['bandmate', 'admin'];
     }
 
     // ---- PLAN LIMITS (keep in step with src/lib/plans.ts and firestore.rules) ---------------------
-    // Picture space = 50 MB (free) or 150 MB (paid), plus 150 MB per add-on pack on the band record.
-    // The total used so far is bands/{bandId}/settings/usage.bytes, kept up to date by the app.
-    function maxBytes(bandId) {
-      let band = firestore.get(/databases/(default)/documents/bands/$(bandId)).data;
-      return ((band.get('plan', 'free') == 'paid' ? 150 : 50) + band.get('extraPacks', 0) * 150) * 1024 * 1024;
-    }
-    function usedBytes(bandId) {
-      let u = /databases/(default)/documents/bands/$(bandId)/settings/usage;
-      return firestore.exists(u) ? firestore.get(u).data.get('bytes', 0) : 0;
+    // Picture space: usage.bytes is the total used so far (kept up to date by the app); usage.limitBytes is
+    // the band's allowance, written only by the BandMate operator (50 MB free, 150 MB pro, +150 MB per pack;
+    // missing = the free 50 MB). A band that is paused can still upload pictures here; it can write nothing else.
+    function roomFor(bandId) {
+      return (firestore.exists(usagePath(bandId)) ? firestore.get(usagePath(bandId)).data.get('bytes', 0) : 0)
+        + request.resource.size
+        <= (firestore.exists(usagePath(bandId)) ? firestore.get(usagePath(bandId)).data.get('limitBytes', 52428800) : 52428800);
     }
 
     // Listing a band's folders (to delete a whole band) is for the BandMate operator only.
@@ -41,12 +45,11 @@ service firebase.storage {
 
     match /bands/{bandId}/{folder}/{file} {
       allow read: if true;
-      allow create, update: if isStaffOf(bandId)
-        && folder in ['qr', 'logo', 'photos']
+      allow create, update: if folder in ['qr', 'logo', 'photos']
         && request.resource.size < 5 * 1024 * 1024
         && request.resource.contentType.matches('image/.*')
-        && usedBytes(bandId) + request.resource.size <= maxBytes(bandId);
-      allow delete: if isStaffOf(bandId);
+        && ((isMemberOf(bandId) && roomFor(bandId)) || isPlatform());
+      allow delete: if isMemberOf(bandId) || isPlatform();
     }
 
     // LEGACY single-band folder (old root layout). REMOVE after the migration is confirmed.

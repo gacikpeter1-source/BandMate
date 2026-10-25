@@ -48,7 +48,7 @@ const { user, created, randomPassword } = await ensureUser(auth, email.toLowerCa
 const batch = db.batch();
 const plan = flags.plan === "paid" ? "paid" : "free";
 batch.set(bandRef, { name, status: "active", createdAt: Date.now(), plan, extraPacks: 0 });
-batch.set(db.doc(`bands/${bandId}/settings/usage`), { items: flags.sample ? SAMPLE_ITEMS.length : 0, bytes: 0, members: 1 });
+batch.set(db.doc(`bands/${bandId}/settings/usage`), { items: flags.sample ? SAMPLE_ITEMS.length : 0, bytes: 0, members: 1, limitBytes: (plan === "paid" ? 150 : 50) * 1024 * 1024 });
 batch.set(db.doc(`bands/${bandId}/settings/public`), DEFAULT_PUBLIC_SETTINGS(name));
 batch.set(db.doc(`bands/${bandId}/settings/band`), { gig: "" });
 batch.set(db.doc(`bands/${bandId}/members/${user.uid}`), { email: email.toLowerCase(), displayName: user.displayName || "Admin", role: "admin", createdAt: Date.now() });

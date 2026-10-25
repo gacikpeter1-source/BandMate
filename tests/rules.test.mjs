@@ -405,21 +405,47 @@ test("invitations: Paid only, admin only, capped by the plan, one tap to remove 
   await assertFails(deleteDoc(doc(as(ids.mateB), "bands", "b", "members", ids.adminB)));
 });
 
-test("storage: picture space is capped by the plan, add-on packs raise it", async () => {
+test("storage: picture space is capped by the band's allowance (usage.limitBytes), set only by the operator", async () => {
   const png = new Uint8Array([137, 80, 78, 71, 13, 10, 26, 10]); // 8 bytes
   const up = (ctx, path) => uploadBytes(ref(ctx.storage(), path), png, { contentType: "image/png" });
   const MB = 1024 * 1024;
-  await setUsage("b", { items: 0, bytes: 50 * MB - 8, members: 1 }); // Free: 50 MB
+  await setUsage("b", { items: 0, bytes: 50 * MB - 8, members: 1, limitBytes: 50 * MB }); // Free: 50 MB
   await assertSucceeds(up(authed(ids.mateB), "bands/b/photos/fits.png"));
-  await setUsage("b", { items: 0, bytes: 50 * MB - 7, members: 1 });
+  await setUsage("b", { items: 0, bytes: 50 * MB - 7, members: 1, limitBytes: 50 * MB });
   await assertFails(up(authed(ids.mateB), "bands/b/photos/over.png"));
-  await setBand("b", { extraPacks: 1 }); // +150 MB
+  await setUsage("b", { items: 0, bytes: 50 * MB - 7, members: 1, limitBytes: 200 * MB }); // +1 pack
   await assertSucceeds(up(authed(ids.mateB), "bands/b/photos/packed.png"));
-  await setUsage("b", { items: 0, bytes: 200 * MB - 7, members: 1 });
+  await setUsage("b", { items: 0, bytes: 200 * MB - 7, members: 1, limitBytes: 200 * MB });
   await assertFails(up(authed(ids.mateB), "bands/b/photos/over2.png"));
-  await setUsage("a", { items: 0, bytes: 150 * MB - 7, members: 1 }); // Paid: 150 MB
+  await setUsage("a", { items: 0, bytes: 150 * MB - 7, members: 1, limitBytes: 150 * MB }); // Pro: 150 MB
   await assertFails(up(authed(ids.mateA), "bands/a/photos/over3.png"));
-  await setUsage("a", { items: 0, bytes: 150 * MB - 8, members: 1 });
+  await setUsage("a", { items: 0, bytes: 150 * MB - 8, members: 1, limitBytes: 150 * MB });
   await assertSucceeds(up(authed(ids.mateA), "bands/a/photos/fits2.png"));
   await assertSucceeds(up(authed(ids.mateA), "bands/a/qr/q.png"));
+  await setUsage("a", { items: 0, bytes: 50 * MB - 7, members: 1 }); // no allowance written yet: the free 50 MB
+  await assertFails(up(authed(ids.mateA), "bands/a/photos/over4.png"));
+  // a band can't raise its own allowance; the operator can
+  const edit = (db, b, data) => setDoc(usageOf(db, b), data, { merge: true });
+  await assertFails(edit(as(ids.adminA), "a", { limitBytes: 999 * MB }));
+  await assertFails(edit(as(ids.mateB), "b", { limitBytes: 999 * MB }));
+  await assertSucceeds(edit(as(ids.mateA), "a", { bytes: 5 })); // other fields stay writable
+  await assertSucceeds(edit(as(ids.platform), "a", { limitBytes: 150 * MB }));
+  await assertSucceeds(edit(as(ids.adminA), "a", { items: 3 })); // unchanged allowance is fine
+});
+
+test("a band created before plans existed (no plan fields, usage without bytes) can still upload and add items", async () => {
+  const png = new Uint8Array([137, 80, 78, 71, 13, 10, 26, 10]);
+  const up = (ctx, path) => uploadBytes(ref(ctx.storage(), path), png, { contentType: "image/png" });
+  await env.withSecurityRulesDisabled(async (ctx) => {
+    const db = ctx.firestore();
+    await setDoc(doc(db, "bands", "old"), { name: "Old", status: "active" }); // no plan, no extraPacks
+    await setDoc(doc(db, "bands", "old", "settings", "usage"), { members: 1 }); // no bytes, no items
+    await setDoc(doc(db, "bands", "old", "members", "u-old"), { email: "old@x.com", displayName: "Old", role: "admin" });
+  });
+  await assertSucceeds(up(authed("u-old"), "bands/old/qr/q.png"));
+  await assertSucceeds(up(authed("u-old"), "bands/old/photos/p.png"));
+  await assertSucceeds(addItem(as("u-old"), "old", "first"));
+  await env.withSecurityRulesDisabled((ctx) => deleteDoc(doc(ctx.firestore(), "bands", "old", "settings", "usage"))); // and with no usage record at all
+  await assertSucceeds(up(authed("u-old"), "bands/old/qr/q2.png"));
+  await assertSucceeds(addItem(as("u-old"), "old", "second"));
 });
