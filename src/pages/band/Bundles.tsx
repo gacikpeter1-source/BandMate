@@ -7,7 +7,8 @@ import { useToast } from "../../state/toast";
 import { errorText, groupItems, money } from "../../lib/format";
 import { removeImage } from "../../lib/images";
 import { useT } from "../../i18n";
-import { ConfirmButton, Icon, ImageField, PhotosField, Sheet, Toggle } from "../../components/ui";
+import { ConfirmButton, Icon, ImageField, PayLinkField, PhotosField, Sheet, Toggle } from "../../components/ui";
+import { cleanPayUrl } from "../../lib/qrdecode";
 import type { Bundle, BundlePart, Photo } from "../../types";
 
 export default function Bundles() {
@@ -62,6 +63,7 @@ function BundleSheet({ bundle, onClose }: { bundle: Bundle | null; onClose: () =
   const [parts, setParts] = useState<BundlePart[]>(bundle?.parts?.length ? bundle.parts.map((p) => ({ ...p })) : [{ name: names[0] || "", qty: 1 }]);
   const [visible, setVisible] = useState(bundle?.visible ?? true);
   const [photos, setPhotos] = useState<Photo[]>(bundle?.images ?? []);
+  const [payUrl, setPayUrl] = useState(bundle?.payUrl ?? "");
   const [qr, setQr] = useState<{ url: string; path: string } | null>(bundle?.qrUrl ? { url: bundle.qrUrl, path: bundle.qrPath || "" } : null);
 
   const setPart = (i: number, p: Partial<BundlePart>) => setParts((ps) => ps.map((x, j) => (j === i ? { ...x, ...p } : x)));
@@ -70,6 +72,8 @@ function BundleSheet({ bundle, onClose }: { bundle: Bundle | null; onClose: () =
     e.preventDefault();
     const clean = parts.filter((p) => p.name).map((p) => ({ name: p.name, qty: Math.max(1, p.qty || 1) }));
     if (!clean.length) return toast(t("bundles.needItem"));
+    const pay = cleanPayUrl(payUrl);
+    if (pay === null) return toast(t("item.payUrlBad"));
     const ref = bundle ? bandDoc("bundles", bundle.id) : doc(bandCol("bundles"));
     setDoc(ref, {
       name: name.trim(),
@@ -78,6 +82,7 @@ function BundleSheet({ bundle, onClose }: { bundle: Bundle | null; onClose: () =
       visible,
       qrUrl: qr?.url ?? null,
       qrPath: qr?.path ?? null,
+      payUrl: pay || null,
       images: photos,
       order: bundle?.order ?? Math.max(0, ...bundles.map((b) => b.order ?? 0)) + 1,
     }).catch((x) => toast(errorText(x)));
@@ -113,7 +118,8 @@ function BundleSheet({ bundle, onClose }: { bundle: Bundle | null; onClose: () =
           <span className="hint">{t("bundles.insideHint")}</span>
         </div>
         <PhotosField label={t("item.photos")} photos={photos} onChange={setPhotos} hint={t("bundles.photosHint")} />
-        <ImageField label={t("item.qr")} folder="qr" url={qr?.url ?? null} onChange={setQr} />
+        <ImageField label={t("item.qr")} folder="qr" url={qr?.url ?? null} onChange={(v) => { setQr(v); if (v?.qrText && cleanPayUrl(v.qrText) && !payUrl.trim()) setPayUrl(cleanPayUrl(v.qrText)!); }} />
+        <PayLinkField id="bPay" value={payUrl} onChange={setPayUrl} />
         <Toggle id="bVisible" checked={visible} onChange={setVisible} label={t("item.visible")} />
         <button className="btn primary block">{bundle ? t("bundles.save") : t("bundles.create")}</button>
         {bundle && (

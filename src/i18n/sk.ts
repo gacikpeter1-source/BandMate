@@ -513,4 +513,11 @@ export const sk: Record<Key, string> = {
   "start.bandEmailHint": "Pošleme sem jeden potvrdzovací odkaz. Použi adresu, ktorú niekto z kapely číta.",
   "start.createAndSend": "Vytvoriť účet a odoslať žiadosť",
   "start.haveAccountQ": "Už máš účet?",
+  "qr.payNow": "Zaplatiť",
+  "qr.opens": "Otvorí {host}",
+  "qr.onPhoneLink": "Skenuješ z iného telefónu? Použi kód. Na tomto telefóne? Klepni na Zaplatiť, alebo podrž obrázok, ulož ho a otvor ho z bankovej aplikácie.",
+  "qr.onPhoneSave": "Skenuješ z iného telefónu? Použi kód. Na tomto telefóne? Podrž obrázok, ulož ho a otvor ho z bankovej aplikácie (mnohé banky vedia načítať QR kód z fotiek).",
+  "item.payUrl": "Odkaz na platbu (nepovinné)",
+  "item.payUrlHint": "Fanúšik na mobile nemôže skenovať kód na vlastnej obrazovke. Ak ti banka dá odkaz na platbu, vlož ho sem a fanúšik dostane tlačidlo Zaplatiť. Odkaz nájdený v tvojom QR obrázku sa doplní sám.",
+  "item.payUrlBad": "Odkaz musí byť webová adresa začínajúca https://",
 };

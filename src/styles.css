@@ -448,3 +448,9 @@ input[type="range"] { width: 100%; accent-color: var(--primary); }
 .plan-opt.off { opacity: .6; cursor: not-allowed; }
 .plan-opt input { grid-row: 1 / span 3; margin-top: 4px; }
 .plan-opt small { grid-column: 2; color: var(--muted); font-size: .8rem; }
+
+/* ---- QR popup (fans' shop page): the QR sits on an always-white tile so phone cameras can read it ---- */
+.qr-sub { margin: 0; font-weight: 700; font-size: 1.15rem; }
+.qr-tile { background: #fff; border-radius: var(--r); padding: 14px; display: grid; place-items: center; }
+.qr-tile img { width: min(100%, 340px); aspect-ratio: 1; object-fit: contain; display: block; }
+.hint.center { text-align: center; }

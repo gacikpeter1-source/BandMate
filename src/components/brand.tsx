@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import QRCode from "qrcode";
 import type { PublicSettings, SocialLink } from "../types";
-import { QrFull } from "./ui";
+import { QrPopup } from "./ui";
 import { tr, useT } from "../i18n";
 
 export const SOCIAL_TYPE_IDS = ["instagram", "facebook", "tiktok", "youtube", "spotify", "bandcamp", "website", "other"];
@@ -61,7 +61,7 @@ export function TopBar({ settings }: { settings: PublicSettings }) {
           {tb.email.trim() && <span className="topbar-mail">{tb.email.trim()}</span>}
         </div>
       </div>
-      {open && <QrFull src={open.src} title={open.title} sub={open.sub} onClose={() => setOpen(null)} />}
+      {open && <QrPopup src={open.src} title={open.title} sub={open.sub} onClose={() => setOpen(null)} />}
     </>
   );
 }

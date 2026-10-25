@@ -10,7 +10,7 @@ import { useTenant } from "../state/tenant";
 import { useT } from "../i18n";
 import LangSwitch from "../components/LangSwitch";
 import { LogoBackdrop, TopBar } from "../components/brand";
-import { Loading, PhotoCarousel, PhotoViewer, QrFull } from "../components/ui";
+import { Loading, PhotoCarousel, PhotoViewer, QrPopup } from "../components/ui";
 import type { Bundle, Item, Photo } from "../types";
 
 /** What fans see: products, prices and payment QR codes. Never stock counts. */
@@ -21,13 +21,13 @@ export default function PublicPage() {
   const { bandId } = useTenant();
   const items = useLiveQuery<Item>(() => query(bandCol("items"), where("visible", "==", true)), `pub-items-${bandId}`);
   const bundles = useLiveQuery<Bundle>(() => query(bandCol("bundles"), where("visible", "==", true)), `pub-bundles-${bandId}`);
-  const [qr, setQr] = useState<{ src: string | null; title: string; sub: string } | null>(null);
+  const [qr, setQr] = useState<{ src: string | null; title: string; sub: string; payUrl?: string | null } | null>(null);
   const [viewer, setViewer] = useState<{ photos: Photo[]; start: number; title: string } | null>(null);
   const cur = settings.currency;
   const groups = groupItems(items.data);
   const bundleList = bundles.data.slice().sort((a, b) => (a.order ?? 0) - (b.order ?? 0));
 
-  const open = (title: string, price: number, src: string | null) => setQr({ src, title, sub: money(price, cur) });
+  const open = (title: string, price: number, src: string | null, payUrl?: string | null) => setQr({ src, title, sub: money(price, cur), payUrl });
 
   return (
     <>
@@ -68,8 +68,8 @@ export default function PublicPage() {
                         <span className="tag">{priceTag(g.items, cur)}</span>
                       </div>
                       {single ? (
-                        <button className="btn primary block" disabled={g.items[0].soldOut} onClick={() => open(g.name, g.items[0].price, g.items[0].qrUrl)}>
-                          {g.items[0].soldOut ? t("fan.soldOut") : g.items[0].qrUrl ? t("fan.showQr") : t("fan.buyAtTable")}
+                        <button className="btn primary block" disabled={g.items[0].soldOut} onClick={() => open(g.name, g.items[0].price, g.items[0].qrUrl, g.items[0].payUrl)}>
+                          {g.items[0].soldOut ? t("fan.soldOut") : g.items[0].qrUrl || g.items[0].payUrl ? t("fan.showQr") : t("fan.buyAtTable")}
                         </button>
                       ) : (
                         <>
@@ -79,7 +79,7 @@ export default function PublicPage() {
                                 key={it.id}
                                 className="chip"
                                 disabled={it.soldOut}
-                                onClick={() => open(itemLabel(it), it.price, it.qrUrl)}
+                                onClick={() => open(itemLabel(it), it.price, it.qrUrl, it.payUrl)}
                                 aria-label={it.soldOut ? t("fan.itemSoldOutAria", { label: itemLabel(it) }) : itemLabel(it)}
                               >
                                 <b>{it.variant || t("common.oneSize")}</b>
@@ -108,8 +108,8 @@ export default function PublicPage() {
                           </div>
                           <span className="tag">{money(b.price, cur)}</span>
                         </div>
-                        <button className="btn primary block" onClick={() => open(b.name, b.price, b.qrUrl)}>
-                          {b.qrUrl ? t("fan.showQr") : t("fan.buyAtTable")}
+                        <button className="btn primary block" onClick={() => open(b.name, b.price, b.qrUrl, b.payUrl)}>
+                          {b.qrUrl || b.payUrl ? t("fan.showQr") : t("fan.buyAtTable")}
                         </button>
                       </article>
                     ))}
@@ -124,7 +124,7 @@ export default function PublicPage() {
         </div>
       </main>
       {viewer && <PhotoViewer photos={viewer.photos} start={viewer.start} title={viewer.title} onClose={() => setViewer(null)} />}
-      {qr && <QrFull src={qr.src} title={qr.title} sub={qr.sub} onClose={() => setQr(null)} />}
+      {qr && <QrPopup src={qr.src} title={qr.title} sub={qr.sub} payUrl={qr.payUrl} onClose={() => setQr(null)} />}
     </>
   );
 }

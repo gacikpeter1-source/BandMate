@@ -5,6 +5,7 @@ import { doc } from "firebase/firestore";
 import { getBandId } from "./scope";
 import { tr } from "../i18n";
 import { assertSpaceRoom } from "./planState";
+import { decodeQr } from "./qrdecode";
 
 async function resize(file: File, max: number, type: "image/png" | "image/webp"): Promise<Blob> {
   let bmp: ImageBitmap;
@@ -40,7 +41,9 @@ export async function uploadImage(file: File, folder: "qr" | "logo" | "photos") 
   const r = ref(storage, path);
   await uploadBytes(r, blob, { contentType: type, cacheControl: "public,max-age=31536000,immutable" });
   await addBytes(blob.size);
-  return { url: await getDownloadURL(r), path };
+  // For a payment QR, also read what is inside it: a payment link in there lets fans on a phone tap instead of scan.
+  const qrText = folder === "qr" ? await decodeQr(blob) : null;
+  return { url: await getDownloadURL(r), path, ...(qrText ? { qrText } : {}) };
 }
 
 /** Keeps the band's "space used" total (settings/usage) in step with what is in Storage. */

@@ -8,7 +8,8 @@ import { errorText, groupItems, itemLabel, money } from "../../lib/format";
 import { addStock, createItems, deleteItem, recordSale, setStockCount, updateItem } from "../../lib/ops";
 import { removeImage } from "../../lib/images";
 import { useT } from "../../i18n";
-import { ConfirmButton, Icon, ImageField, PhotosField, QrFull, Sheet, Toggle } from "../../components/ui";
+import { ConfirmButton, Icon, ImageField, PayLinkField, PhotosField, QrPopup, Sheet, Toggle } from "../../components/ui";
+import { cleanPayUrl } from "../../lib/qrdecode";
 import type { Item, Photo } from "../../types";
 
 const pill = (n: number) => (n < 0 ? "out" : n === 0 ? "out" : n <= 3 ? "low" : "ok");
@@ -93,7 +94,7 @@ export default function Stock() {
       </div>
       {edit && <ItemSheet item={edit === "new" ? null : edit} onClose={() => setEdit(null)} />}
       {restock && <RestockSheet item={restock} onClose={() => setRestock(null)} />}
-      {zoom && <QrFull src={zoom.qrUrl} title={itemLabel(zoom)} sub={money(zoom.price, cur)} onClose={() => setZoom(null)} />}
+      {zoom && <QrPopup src={zoom.qrUrl} title={itemLabel(zoom)} sub={money(zoom.price, cur)} payUrl={zoom.payUrl} onClose={() => setZoom(null)} />}
     </>
   );
 }
@@ -168,6 +169,7 @@ function ItemSheet({ item, onClose }: { item: Item | null; onClose: () => void }
   const [count, setCount] = useState(item ? String(stock[item.id] ?? 0) : "");
   const [visible, setVisible] = useState(item?.visible ?? true);
   const [qr, setQr] = useState<{ url: string; path: string } | null>(item?.qrUrl ? { url: item.qrUrl, path: item.qrPath || "" } : null);
+  const [payUrl, setPayUrl] = useState(item?.payUrl ?? "");
   const [applyQrToGroup, setApplyQrToGroup] = useState(false);
   // Photos belong to the product, so every size of it shares one set (kept in sync on save).
   const sameName = (a: string, b: string) => a.trim().toLowerCase() === b.trim().toLowerCase();
@@ -182,9 +184,11 @@ function ItemSheet({ item, onClose }: { item: Item | null; onClose: () => void }
     e.preventDefault();
     const p = Number(price) || 0;
     const q = Math.max(0, parseInt(count) || 0);
+    const pay = cleanPayUrl(payUrl);
+    if (pay === null) return toast(t("item.payUrlBad"));
     const done = (x: Promise<unknown>) => x.catch((err) => toast(errorText(err)));
     if (item) {
-      done(updateItem(item.id, { name: name.trim(), variant: variant.trim(), price: p, visible, qrUrl: qr?.url ?? null, qrPath: qr?.path ?? null, images: shownPhotos }));
+      done(updateItem(item.id, { name: name.trim(), variant: variant.trim(), price: p, visible, qrUrl: qr?.url ?? null, qrPath: qr?.path ?? null, payUrl: pay || null, images: shownPhotos }));
       const before = (startPhotos ?? []).map((x) => x.url).join("|");
       if (shownPhotos.map((x) => x.url).join("|") !== before) {
         siblings.forEach((s) => done(updateItem(s.id, { images: shownPhotos })));
@@ -192,13 +196,13 @@ function ItemSheet({ item, onClose }: { item: Item | null; onClose: () => void }
         (startPhotos ?? []).filter((x) => !keep.has(x.path)).forEach((x) => removeImage(x.path));
       }
       if (q !== (stock[item.id] ?? 0)) done(setStockCount(item.id, q));
-      if (applyQrToGroup) siblings.forEach((s) => done(updateItem(s.id, { qrUrl: qr?.url ?? null, qrPath: qr?.path ?? null })));
+      if (applyQrToGroup) siblings.forEach((s) => done(updateItem(s.id, { qrUrl: qr?.url ?? null, qrPath: qr?.path ?? null, payUrl: pay || null })));
       toast(t("item.saved", { label: itemLabel({ name, variant }) }));
     } else {
       const variants = variant.split(",").map((v) => v.trim()).filter(Boolean);
       const order = Math.max(0, ...items.map((i) => i.order ?? 0)) + 1;
       try {
-        done(createItems({ name: name.trim(), price: p, qrUrl: qr?.url ?? null, qrPath: qr?.path ?? null, visible, images: shownPhotos }, variants, q, order));
+        done(createItems({ name: name.trim(), price: p, qrUrl: qr?.url ?? null, qrPath: qr?.path ?? null, payUrl: pay || null, visible, images: shownPhotos }, variants, q, order));
       } catch (limit) {
         return toast(errorText(limit)); // over the plan's item limit: keep the form open so nothing typed is lost
       }
@@ -232,7 +236,8 @@ function ItemSheet({ item, onClose }: { item: Item | null; onClose: () => void }
           </div>
         </div>
         <PhotosField label={t("item.photos")} photos={shownPhotos} onChange={setPhotos} hint={t("item.photosHint")} />
-        <ImageField label={t("item.qr")} folder="qr" url={qr?.url ?? null} onChange={setQr} hint={t("item.qrHint")} />
+        <ImageField label={t("item.qr")} folder="qr" url={qr?.url ?? null} onChange={(v) => { setQr(v); if (v?.qrText && cleanPayUrl(v.qrText) && !payUrl.trim()) setPayUrl(cleanPayUrl(v.qrText)!); }} hint={t("item.qrHint")} />
+        <PayLinkField id="fPay" value={payUrl} onChange={setPayUrl} />
         {item && siblings.length > 0 && (
           <Toggle id="fGroupQr" checked={applyQrToGroup} onChange={setApplyQrToGroup} label={t("item.qrAll", { name: item.name })} hint={t("item.qrAllHint", { list: siblings.map((s) => s.variant || t("item.oneSizeLower")).join(", ") })} />
         )}

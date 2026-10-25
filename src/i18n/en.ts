@@ -511,6 +511,13 @@ export const en = {
   "start.bandEmailHint": "We send one confirmation link here. Use an address someone in the band reads.",
   "start.createAndSend": "Create account and send request",
   "start.haveAccountQ": "Already have an account?",
+  "qr.payNow": "Pay now",
+  "qr.opens": "Opens {host}",
+  "qr.onPhoneLink": "Scanning from another phone? Use the code. On this phone? Tap Pay now, or hold the picture to save it and open it from your banking app.",
+  "qr.onPhoneSave": "Scanning from another phone? Use the code. On this phone? Hold the picture to save it, then open it from your banking app (many banks can read a QR code from your photos).",
+  "item.payUrl": "Payment link (optional)",
+  "item.payUrlHint": "Fans on a phone can't scan a code on their own screen. If your bank gives you a payment link, paste it here and they get a Pay now button. A link found inside your QR picture is filled in for you.",
+  "item.payUrlBad": "The link must be a web address starting with https://",
 } as const;
 
 export type Key = keyof typeof en;

@@ -23,6 +23,8 @@ export interface Item {
   price: number;
   qrUrl: string | null;
   qrPath: string | null;
+  /** Optional https payment link (from the bank) a fan on a phone can tap instead of scanning. */
+  payUrl?: string | null;
   visible: boolean;
   soldOut: boolean;
   order: number;
@@ -42,6 +44,7 @@ export interface Bundle {
   parts: BundlePart[];
   qrUrl: string | null;
   qrPath: string | null;
+  payUrl?: string | null;
   visible: boolean;
   order: number;
   images?: Photo[];

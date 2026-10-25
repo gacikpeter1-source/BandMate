@@ -2,6 +2,7 @@ import { useEffect, useRef, useState, type ReactNode } from "react";
 import { removeImage, uploadImage } from "../lib/images";
 import { errorText } from "../lib/format";
 import { LimitError } from "../lib/planState";
+import { cleanPayUrl, hostOf } from "../lib/qrdecode";
 import { LimitNote } from "./plans";
 import { useT } from "../i18n";
 import type { Photo } from "../types";
@@ -52,6 +53,43 @@ export function Sheet({ title, onClose, children }: { title: string; onClose: ()
   );
 }
 
+/** The same QR (and optional payment link) as a popup in the app's own style, for fans browsing the shop. */
+export function QrPopup({ src, title, sub, payUrl, onClose }: { src: string | null; title: string; sub?: string; payUrl?: string | null; onClose: () => void }) {
+  const t = useT();
+  const link = payUrl ? cleanPayUrl(payUrl) : "";
+  return (
+    <Sheet title={title} onClose={onClose}>
+      {sub && <p className="qr-sub">{sub}</p>}
+      {src && (
+        <div className="qr-tile">
+          <img src={src} alt={t("qr.alt", { title })} />
+        </div>
+      )}
+      {link && (
+        <>
+          <a className="btn primary block" href={link} target="_blank" rel="noopener noreferrer">{t("qr.payNow")}</a>
+          <span className="hint center">{t("qr.opens", { host: hostOf(link) })}</span>
+        </>
+      )}
+      {src ? <p className="hint">{link ? t("qr.onPhoneLink") : t("qr.onPhoneSave")}</p> : !link && <p className="note">{t("qr.payAtTable")}</p>}
+      <button className="btn ghost block" onClick={onClose}>{t("common.close")}</button>
+    </Sheet>
+  );
+}
+
+/** Optional payment link next to the QR picture (item and bundle forms). */
+export function PayLinkField({ id, value, onChange }: { id: string; value: string; onChange: (v: string) => void }) {
+  const t = useT();
+  const bad = value.trim() !== "" && cleanPayUrl(value) === null;
+  return (
+    <div className="field">
+      <label htmlFor={id}>{t("item.payUrl")}</label>
+      <input id={id} type="url" inputMode="url" autoCapitalize="none" autoCorrect="off" spellCheck={false} value={value} onChange={(e) => onChange(e.target.value)} placeholder="https://" />
+      {bad ? <span className="hint err">{t("item.payUrlBad")}</span> : <span className="hint">{t("item.payUrlHint")}</span>}
+    </div>
+  );
+}
+
 /** Full-screen white QR so a fan's phone camera can read it under stage lights. */
 export function QrFull({ src, title, sub, onClose }: { src: string | null; title: string; sub?: string; onClose: () => void }) {
   const t = useT();
@@ -92,7 +130,7 @@ export function ImageField({
   hint?: string;
   url: string | null;
   folder: "qr" | "logo";
-  onChange: (v: { url: string; path: string } | null) => void;
+  onChange: (v: { url: string; path: string; qrText?: string } | null) => void;
   wide?: boolean;
 }) {
   const t = useT();
