@@ -54,7 +54,6 @@ export default function PublicPage() {
             </div>
           ) : (
             <>
-              <p className="lead">{t("fan.lead")}</p>
               <div className="grid">
                 {groups.map((g) => {
                   const single = g.items.length === 1 && !g.items[0].variant;

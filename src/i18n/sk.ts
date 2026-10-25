@@ -101,7 +101,6 @@ export const sk: Record<Key, string> = {
   "verify.sentOk": "Odoslané. Pozri si schránku aj spam.",
   "verify.notYet": "Zatiaľ nepotvrdené. Najprv otvor odkaz v e-maile.",
   "verify.fanPage": "Zobraziť stránku pre fanúšikov",
-  "fan.lead": "Vyber si položku a zaplať naskenovaním jej QR kódu. Potvrdenie platby ukáž pri merch stánku a vyzdvihni si tovar.",
   "fan.comingTitle": "Merch už čoskoro",
   "fan.comingText": "Pozri sa znova na ďalšom koncerte.",
   "fan.loading": "Načítavam merch…",

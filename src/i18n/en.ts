@@ -99,7 +99,6 @@ export const en = {
   "verify.sentOk": "Sent. Check your inbox and your spam folder.",
   "verify.notYet": "Not confirmed yet. Open the link in the email first.",
   "verify.fanPage": "See the fan page",
-  "fan.lead": "Pick an item and scan its QR code to pay. Show the payment confirmation at the merch table to collect it.",
   "fan.comingTitle": "Merch is coming soon",
   "fan.comingText": "Check back at the next show.",
   "fan.loading": "Loading the merch…",
