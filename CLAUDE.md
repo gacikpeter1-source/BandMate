@@ -85,7 +85,7 @@ Accounts made by the scripts are marked verified. Unverified Auth accounts stay 
 - Top level: `bands/{bandId}` {name, status, createdAt}, `domains/{host}` {bandId}, `platformAdmins/{uid}`,
   `bandRequests/{uid}` (see Tenancy; only the founder and the operator can read it).
 - `members/{uid}`: email, displayName, role, createdAt.
-- `items/{id}`: name, variant (size), price, qrUrl, qrPath, images[{url,path}], visible, soldOut, order. Public if visible.
+- `items/{id}`: name, variant (size), price, qrUrl, qrPath, payUrl (optional https payment link), images[{url,path}], visible, soldOut, order. Public if visible.
   Sizes of one product share the same `name`; the UI groups by name. Photos belong to the product: the item
   form writes the same `images` to every size of that name (first photo = main). `bundles` also have `images`.
 - `stock/{itemId}`: { qty } — staff only. Kept separate so fans can never read counts.
@@ -132,6 +132,15 @@ Accounts made by the scripts are marked verified. Unverified Auth accounts stay 
 - `state/auth.tsx` confirms a remembered (cached) membership with the server before opening the desk (offline it trusts the cache): a
   removed person's browser must not start listeners it can no longer read, which crashed the Firestore client.
 - Do not name a CSS class `locked`: `body.locked` is the scroll lock used by sheets (the plan lock class is `plan-locked`).
+
+## Payment QR and payment link
+- The QR is a picture the band uploads from its own bank app (e.g. VÚB, SumUp); BandMate never creates it or touches the payment, and
+  it counts toward the picture space. A fan on a phone can't scan their own screen, so an item/bundle can also carry `payUrl` (https only,
+  `cleanPayUrl` in `lib/qrdecode.ts`): `uploadImage` reads the QR picture in the browser (`jsqr`, loaded on demand) and, if it
+  contains an https link, fills the field; otherwise the band pastes a bank payment link by hand. Slovak PAY by square codes are NOT
+  links (only a bank app can read them), so for those the fan popup tells them to save the picture and open it from the banking app.
+- Fans see `QrPopup` (a `Sheet` in the app's style, QR on an always-white tile, "Pay now" button + the link's host when `payUrl` is set).
+  The staff-only full-screen view (`QrFull`, wake lock) remains only in the Sell sheet's explicit "full screen" action.
 
 ## Languages (English + Slovak)
 - Every visible phrase lives in `src/i18n/en.ts` and `src/i18n/sk.ts` (same keys; `sk` is typed against `en`, so a missing
