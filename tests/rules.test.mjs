@@ -271,6 +271,8 @@ test("only the BandMate operator can wipe a band; a band's own admin cannot dele
   await assertSucceeds(deleteDoc(p("items", "hat")));
   await assertSucceeds(deleteDoc(p("stock", "hat")));
   await assertSucceeds(deleteDoc(p("members", ids.mateB)));
+  await env.withSecurityRulesDisabled(async (ctx) => { await setDoc(doc(ctx.firestore(), "bands", "b", "members", ids.platform), { email: "ops@x.com", displayName: "Ops", role: "admin", createdAt: 1 }); });
+  await assertSucceeds(deleteDoc(p("members", ids.platform))); // the operator can remove even their own membership
   await assertSucceeds(deleteDoc(p("members", ids.both)));
   await assertSucceeds(deleteDoc(p("settings", "public")));
   await assertSucceeds(deleteDoc(p("settings", "band")));

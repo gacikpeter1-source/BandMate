@@ -100,7 +100,7 @@ service cloud.firestore {
         allow update: if (isAdmin() && (request.auth.uid != uid || onlyChanges(['displayName'])))
           || (verified() && request.auth.uid == uid && onlyChanges(['displayName']));
 
-        allow delete: if isAdmin() && request.auth.uid != uid;
+        allow delete: if (isAdmin() && request.auth.uid != uid) || platformAdmin(); // the operator may remove anyone, even their own membership (deleting a whole band)
       }
 
       // Public catalogue: fans see visible items and prices, never stock counts.
