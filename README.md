@@ -104,9 +104,9 @@ From then on, every push to `main` redeploys automatically.
 
 ## How band members join
 
-Nobody joins on their own. On a **Paid** band the admin invites each person by email:
+Nobody joins on their own. On a **Pro** band the admin invites each person by email:
 
-1. The admin opens **People**, types the person's email and taps **Send invitation** (a Paid band has room for 3 people).
+1. The admin opens **People**, types the person's email and taps **Send invitation** (a Pro band has room for 3 people).
 2. The person gets an email with a link. The link confirms the address; they choose a name and a password.
 3. They land in the band desk. The admin can remove anyone from **People** at any time, in one tap.
 
@@ -114,7 +114,7 @@ A **Free** band is just for one person (the one who registered), so there is nob
 
 ## Plans
 
-Free: 1 person, 100 items, 50 MB of pictures. Paid (2 € a month): 3 people, 200 items, 150 MB, your own colours and design, your own domain. Extra picture space: +150 MB for 2 € a month, as often as needed. The numbers are in `src/lib/plans.ts`, `firestore.rules` and `storage.rules`. Online payment is not connected yet, so the BandMate operator switches a band to Paid in the console (`/platform`) or with `node scripts/set-plan.mjs <bandId> paid`. For a band created before plans existed, run `node scripts/recount-usage.mjs <bandId> --bucket <your-storage-bucket>` once.
+Free: 1 person, 100 items, 50 MB of pictures. Pro (2 € a month): 3 people, 200 items, 150 MB, your own colours and design, your own domain. Extra picture space: +150 MB for 2 € a month, as often as needed. The numbers are in `src/lib/plans.ts`, `firestore.rules` and `storage.rules`. Online payment is not connected yet, so the BandMate operator switches a band to Pro in the console (`/platform`) or with `node scripts/set-plan.mjs <bandId> paid` ("paid" is the stored name of Pro). For a band created before plans existed, run `node scripts/recount-usage.mjs <bandId> --bucket <your-storage-bucket>` once.
 
 To let people be invited, turn on **Authentication → Sign-in method → Email/Password → Email link (passwordless sign-in)** in Firebase.
 

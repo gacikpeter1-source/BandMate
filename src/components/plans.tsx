@@ -1,6 +1,8 @@
 import { useState } from "react";
 import { EXTRA_PACK_MB, PAID_CHECKOUT_ENABLED, PLAN_LIMITS, PRICE_PACK, PRICE_PAID, mbText, type Limits, type Usage } from "../lib/plans";
 import { useT } from "../i18n";
+import { PLATFORM_HOST } from "../lib/host";
+import { getBandId } from "../lib/scope";
 import { Sheet } from "./ui";
 
 const Tick = ({ on }: { on: boolean }) => {
@@ -96,6 +98,9 @@ export function UsageCard({ limits, usage, packs }: { limits: Limits; usage: Usa
       <p className="note">
         <span className={`pill ${limits.plan === "paid" ? "ok" : "low"}`}>{limits.plan === "paid" ? t("plan.paid") : t("plan.free")}</span>
         {packs > 0 && <> {t("plan.packs", { n: packs })}</>}
+      </p>
+      <p className="note">
+        {t("plan.address")}: <a href={`https://${getBandId()}.${PLATFORM_HOST}`}>{getBandId()}.{PLATFORM_HOST}</a>
       </p>
       <Meter label={t("plan.usageItems", { used: Math.max(0, usage.items), max: limits.items })} used={usage.items} max={limits.items} />
       <Meter label={t("plan.usageSpace", { used: mbText(usage.bytes), max: mbText(limits.bytes) })} used={usage.bytes} max={limits.bytes} />

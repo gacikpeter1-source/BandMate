@@ -36,13 +36,13 @@ email/password, Firestore, Storage), hosted on Vercel, code on GitHub. Setup ste
   index in `firestore.indexes.json`). The operator login at `/platform/login` still exists.
 - Getting a band (self-service): bandmate.shop home "Start Your BandMate" button (`/start`,
   `src/pages/platform/StartPage.tsx`) is ONE form: your name, band name, address (= future `bandId`, checked live), plan
-  (Free, or Paid shown as "coming soon"; "Compare plans" opens `PlanTable`), band email (this is the master login, the only
+  (Free, or Pro shown as "coming soon"; "Compare plans" opens `PlanTable`), band email (this is the master login, the only
   email asked for), password, terms checkbox. Submitting creates the Firebase account, sends the verification email and
   keeps the typed values in localStorage (`bandmate-start-draft`); once the email is confirmed the request is filed by
   itself (`bandRequests/{uid}`: band name, address, `plan: "free"`, `termsVersion` + server-stamped `termsAcceptedAt`).
   A confirmed account with no request and no draft (other device) gets the short `RequestForm`. **Free bands wait for the
   operator**, who approves in `/platform` (`approveBandRequest` in `src/lib/platform.ts`, one transaction: band with
-  `plan`/`extraPacks`, default settings, `settings/usage`, founder as `admin` member) or rejects. **Paid is built but off**:
+  `plan`/`extraPacks`, default settings, `settings/usage`, founder as `admin` member) or rejects. **Pro is built but off**:
   `PAID_CHECKOUT_ENABLED` in `src/lib/plans.ts` is false (no Stripe yet), firestore.rules only accepts `plan: "free"` in a request.
   When Stripe exists, a paid sign-up should create the band at once after payment. The founder sees the result at `/start` and
   signs in again at the band's own address (sign-in is per address). Terms text is a PLACEHOLDER (`TermsPage.tsx`);
@@ -102,8 +102,8 @@ Accounts made by the scripts are marked verified. Unverified Auth accounts stay 
   Photos are shrunk to 1400px WebP on the phone before upload (`src/lib/images.ts`); max 6 per product.
   Fan page shows them in a swipeable `PhotoCarousel` with a full-screen `PhotoViewer` (`src/components/ui.tsx`).
 
-## Plans and limits (`src/lib/plans.ts`, `src/lib/planState.ts`, `src/components/plans.tsx`)
-| | Free | Paid (2 €/month, Stripe fee included) |
+## Plans and limits (plans are named Free and Pro, any later one "Ultimate"; the stored value for Pro is still `"paid"`, only the shown name changed) (`src/lib/plans.ts`, `src/lib/planState.ts`, `src/components/plans.tsx`)
+| | Free | Pro (2 €/month, Stripe fee included; stored as plan "paid") |
 |---|---|---|
 | People | 1 | 3 (invited by email) |
 | Items | 100 | 200 |
