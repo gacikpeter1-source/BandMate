@@ -45,7 +45,7 @@ function Waiting() {
         <div className="card-top"><span /><LangSwitch /></div>
         <h1>{disabled ? t("wait.disabledTitle") : t("wait.title")}</h1>
         <p className="note">
-          {disabled ? t("wait.disabledText") : !profile ? t("wait.noProfile") : t("wait.text", { email: user?.email ?? "" })}
+          {disabled ? t("wait.disabledText") : !profile ? t("wait.noProfile", { email: user?.email ?? "" }) : t("wait.text", { email: user?.email ?? "" })}
         </p>
         <div className="stack-sm">
           <Link className="btn ghost block" to="/">{t("verify.fanPage")}</Link>

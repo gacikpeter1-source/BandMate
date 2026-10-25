@@ -426,3 +426,25 @@ input[type="range"] { width: 100%; accent-color: var(--primary); }
   .sheet { animation: up .22s ease-out; }
   @keyframes up { from { transform: translateY(30px); opacity: .6; } }
 }
+
+/* ---- plans: comparison table, usage meters ---- */
+.plantable { display: flex; flex-direction: column; gap: 2px; font-size: .92rem; }
+.pt-row { display: grid; grid-template-columns: minmax(0, 1.5fr) minmax(0, 1fr) minmax(0, 1fr); gap: 8px; align-items: center; padding: 9px 0; border-top: 1px solid var(--line); }
+.pt-row > span:not(:first-child), .pt-row > b { text-align: center; }
+.pt-head { border-top: 0; font-family: var(--f-display); text-transform: uppercase; letter-spacing: .02em; }
+.pt-soon { display: block; font-family: var(--f-body); font-weight: 400; text-transform: none; font-size: .72rem; color: var(--muted); }
+.tick.yes { color: var(--ok-ink); font-weight: 900; }
+.tick.no { color: var(--muted); }
+.meter { display: flex; flex-direction: column; gap: 5px; font-size: .9rem; }
+.meter .bar { height: 8px; border-radius: 999px; background: var(--sunk); overflow: hidden; }
+.meter .bar i { display: block; height: 100%; background: var(--ok); border-radius: 999px; }
+.meter .bar i.near { background: var(--low); }
+.meter .bar i.full { background: var(--out); }
+.limitnote { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 10px; }
+.plan-locked { opacity: .55; pointer-events: none; }
+.plans-pick { display: grid; gap: 8px; }
+.plan-opt { display: grid; grid-template-columns: auto 1fr; column-gap: 10px; row-gap: 2px; align-items: start; padding: 10px 12px; border: 1.5px solid var(--line); border-radius: var(--r); background: var(--sunk); cursor: pointer; }
+.plan-opt.sel { border-color: var(--primary); background: var(--primary-soft); }
+.plan-opt.off { opacity: .6; cursor: not-allowed; }
+.plan-opt input { grid-row: 1 / span 3; margin-top: 4px; }
+.plan-opt small { grid-column: 2; color: var(--muted); font-size: .8rem; }

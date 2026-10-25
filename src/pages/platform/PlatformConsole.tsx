@@ -5,7 +5,9 @@ import { query, where } from "firebase/firestore";
 import { auth } from "../../firebase";
 import { PLATFORM_HOST } from "../../lib/host";
 import { activeBands, fetchMyBands, type MyBand } from "../../lib/memberships";
-import { addBandDomain, approveBandRequest, bandsCol, deleteBand, domainsCol, rejectBandRequest, requestsCol, setBandStatus } from "../../lib/platform";
+import { addBandDomain, approveBandRequest, bandsCol, deleteBand, domainsCol, rejectBandRequest, requestsCol, setBandPlan, setBandStatus } from "../../lib/platform";
+import { limitsOf, mbText } from "../../lib/plans";
+
 import { useLiveQuery } from "../../lib/live";
 import { errorText } from "../../lib/format";
 import { useAuth } from "../../state/auth";
@@ -103,6 +105,19 @@ export default function PlatformConsole() {
               <p className="note">
                 {b.id} · {b.status === "active" ? t("con.statusActive") : t("con.statusPaused")}
               </p>
+              <p className="note">
+                <span className={`pill ${b.plan === "paid" ? "ok" : "low"}`}>{b.plan === "paid" ? t("plan.paid") : t("plan.free")}</span>{" "}
+                {t("con.limits", { items: limitsOf(b).items, mb: mbText(limitsOf(b).bytes), users: limitsOf(b).users })}
+              </p>
+              <div className="row-form">
+                <select className="filter" value={b.plan === "paid" ? "paid" : "free"} disabled={busy === `p-${b.id}`} aria-label={t("con.planFor", { name: b.name })} onChange={(e) => run(`p-${b.id}`, setBandPlan(b.id, e.target.value as "free" | "paid", b.extraPacks || 0), t("con.planSet", { name: b.name }))}>
+                  <option value="free">{t("plan.free")}</option>
+                  <option value="paid">{t("plan.paid")}</option>
+                </select>
+                <button className="btn ghost sm" disabled={!b.extraPacks || busy === `p-${b.id}`} aria-label={t("con.packLess")} onClick={() => run(`p-${b.id}`, setBandPlan(b.id, b.plan === "paid" ? "paid" : "free", (b.extraPacks || 0) - 1), t("con.planSet", { name: b.name }))}>−</button>
+                <span className="note">{t("plan.packs", { n: b.extraPacks || 0 })}</span>
+                <button className="btn ghost sm" disabled={busy === `p-${b.id}`} aria-label={t("con.packMore")} onClick={() => run(`p-${b.id}`, setBandPlan(b.id, b.plan === "paid" ? "paid" : "free", (b.extraPacks || 0) + 1), t("con.planSet", { name: b.name }))}>+</button>
+              </div>
               <p className="note">
                 {t("con.addresses", { list: [`${b.id}.${PLATFORM_HOST}`, ...domains.data.filter((d) => d.bandId === b.id).map((d) => d.id)].join(", ") })}
               </p>

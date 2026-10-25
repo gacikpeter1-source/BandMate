@@ -22,6 +22,18 @@ service firebase.storage {
       );
     }
 
+    // ---- PLAN LIMITS (keep in step with src/lib/plans.ts and firestore.rules) ---------------------
+    // Picture space = 50 MB (free) or 150 MB (paid), plus 150 MB per add-on pack on the band record.
+    // The total used so far is bands/{bandId}/settings/usage.bytes, kept up to date by the app.
+    function maxBytes(bandId) {
+      let band = firestore.get(/databases/(default)/documents/bands/$(bandId)).data;
+      return ((band.get('plan', 'free') == 'paid' ? 150 : 50) + band.get('extraPacks', 0) * 150) * 1024 * 1024;
+    }
+    function usedBytes(bandId) {
+      let u = /databases/(default)/documents/bands/$(bandId)/settings/usage;
+      return firestore.exists(u) ? firestore.get(u).data.get('bytes', 0) : 0;
+    }
+
     // Listing a band's folders (to delete a whole band) is for the BandMate operator only.
     match /bands/{bandId}/{allPaths=**} {
       allow list: if isPlatform();
@@ -32,7 +44,8 @@ service firebase.storage {
       allow create, update: if isStaffOf(bandId)
         && folder in ['qr', 'logo', 'photos']
         && request.resource.size < 5 * 1024 * 1024
-        && request.resource.contentType.matches('image/.*');
+        && request.resource.contentType.matches('image/.*')
+        && usedBytes(bandId) + request.resource.size <= maxBytes(bandId);
       allow delete: if isStaffOf(bandId);
     }
 

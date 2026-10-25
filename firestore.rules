@@ -51,7 +51,7 @@ service cloud.firestore {
       allow read: if (verified() && request.auth.uid == uid) || platformAdmin();
       allow create: if verified()
         && request.auth.uid == uid
-        && request.resource.data.keys().hasOnly(['uid', 'email', 'displayName', 'bandName', 'bandId', 'domain', 'termsVersion', 'termsAcceptedAt', 'status', 'createdAt'])
+        && request.resource.data.keys().hasOnly(['uid', 'email', 'displayName', 'bandName', 'bandId', 'domain', 'plan', 'termsVersion', 'termsAcceptedAt', 'status', 'createdAt'])
         && request.resource.data.keys().hasAll(['uid', 'email', 'displayName', 'bandName', 'bandId', 'termsVersion', 'termsAcceptedAt', 'status', 'createdAt'])
         && request.resource.data.uid == uid
         && request.resource.data.email == request.auth.token.email
@@ -66,7 +66,8 @@ service cloud.firestore {
         && request.resource.data.bandId.matches('^[a-z0-9]+(-[a-z0-9]+)*$')
         && !(request.resource.data.bandId in ['www', 'app', 'admin', 'api', 'mail', 'platform', 'static', 'assets', 'cdn', 'help', 'support', 'status', 'docs', 'blog', 'login', 'b'])
         && !exists(/databases/$(database)/documents/bands/$(request.resource.data.bandId))
-        && (!('domain' in request.resource.data) || (request.resource.data.domain is string && request.resource.data.domain.size() <= 253));
+        && (!('domain' in request.resource.data) || (request.resource.data.domain is string && request.resource.data.domain.size() <= 253))
+        && request.resource.data.get('plan', 'free') == 'free';  // Paid can't be asked for until online payment exists
       allow update: if platformAdmin();
       allow delete: if (verified() && request.auth.uid == uid && resource.data.status in ['pending', 'rejected']) || platformAdmin();
     }
@@ -79,6 +80,15 @@ service cloud.firestore {
       function isAdmin() { return (active() && memberRole() == 'admin') || platformAdmin(); }
       function isStaff() { return (active() && memberRole() in ['bandmate', 'admin']) || platformAdmin(); }
 
+      // ---- PLAN LIMITS (keep in step with src/lib/plans.ts and storage.rules) ----------------------
+      // plan and extraPacks live on bands/{bandId} and only the operator can change them. The running
+      // totals are in settings/usage, which the app updates in the same batch as the change itself.
+      function paid() { return get(bandRef()).data.get('plan', 'free') == 'paid'; }
+      function maxItems() { return paid() ? 200 : 100; }
+      function maxMembers() { return paid() ? 3 : 1; }
+      function usageRef() { return /databases/$(database)/documents/bands/$(bandId)/settings/usage; }
+      function inviteRef() { return /databases/$(database)/documents/bands/$(bandId)/invites/$(request.auth.token.email.lower()); }
+
       // Name/status of one band is public (needed to show its store); the list of all bands is not.
       allow get: if true;
       allow list, write: if platformAdmin();
@@ -86,14 +96,16 @@ service cloud.firestore {
       match /members/{uid} {
         allow read: if verified() && (request.auth.uid == uid || isStaff());
 
-        // Self sign-up always starts as "pending". Nobody can make themselves a band mate.
-        allow create: if (verified()
+        // Nobody can join on their own. A person joins by accepting an invitation an admin sent to their
+        // (verified) email address; the operator creates the founder when a band is approved.
+        allow create: if platformAdmin()
+          || (verified()
             && request.auth.uid == uid
             && active()
-            && request.resource.data.role == 'pending'
+            && exists(inviteRef())
+            && request.resource.data.role == get(inviteRef()).data.role
             && request.resource.data.email == request.auth.token.email
-            && request.resource.data.keys().hasOnly(['email', 'displayName', 'role', 'createdAt']))
-          || platformAdmin();
+            && request.resource.data.keys().hasOnly(['email', 'displayName', 'role', 'createdAt']));
 
         // Admins approve and change roles (but never their own role, to avoid lock-out).
         // Everyone may change their own display name.
@@ -106,7 +118,8 @@ service cloud.firestore {
       // Public catalogue: fans see visible items and prices, never stock counts.
       match /items/{id} {
         allow read: if (resource.data.visible == true && active()) || isStaff();
-        allow write: if isStaff();
+        allow create: if isStaff() && getAfter(usageRef()).data.get('items', 0) <= maxItems();
+        allow update, delete: if isStaff();
       }
       match /bundles/{id} {
         allow read: if (resource.data.visible == true && active()) || isStaff();
@@ -125,13 +138,42 @@ service cloud.firestore {
       }
 
       // Band name, colours, logo and the fan-screen top bar.
+      // Colours and the logo backdrop are a paid feature; the name, tagline, currency and top bar are not.
       match /settings/public {
         allow read: if true;
-        allow write: if isStaff();
+        allow create: if isStaff();
+        allow update: if isStaff() && (paid()
+          || !request.resource.data.diff(resource.data).affectedKeys().hasAny(['theme', 'preset', 'logoUrl', 'logoPath', 'logoOpacity', 'logoInHeader']));
+        allow delete: if platformAdmin();
       }
       // Current gig and other internal settings.
       match /settings/band {
         allow read, write: if isStaff();
+      }
+      // How much of the plan is used: items, picture bytes, members + open invitations.
+      match /settings/usage {
+        allow read: if isStaff();
+        allow create, update: if isStaff()
+          && request.resource.data.keys().hasOnly(['items', 'bytes', 'members'])
+          && request.resource.data.get('items', 0) >= 0
+          && request.resource.data.get('bytes', 0) >= 0
+          && request.resource.data.get('members', 0) >= 0;
+        allow delete: if platformAdmin();
+      }
+
+      // Invitations to join (paid plans). Doc id = the invited person's lowercase email address.
+      match /invites/{emailId} {
+        // A person can look up only the invitation addressed to their own email (the id), never others'.
+        allow get: if isAdmin() || (verified() && emailId == request.auth.token.email.lower());
+        allow list: if isAdmin();
+        allow create: if isAdmin()
+          && paid()
+          && getAfter(usageRef()).data.get('members', 0) <= maxMembers()
+          && request.resource.data.keys().hasOnly(['email', 'role', 'invitedBy', 'createdAt'])
+          && request.resource.data.role == 'bandmate'
+          && emailId == request.resource.data.email
+          && emailId == emailId.lower();
+        allow delete: if isAdmin() || (verified() && emailId == request.auth.token.email.lower());
       }
     }
 

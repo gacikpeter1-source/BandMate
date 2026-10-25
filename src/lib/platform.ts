@@ -41,14 +41,14 @@ export async function isBandIdTaken(id: string) {
   return (await getDoc(doc(db, "bands", id))).exists();
 }
 
-export function fileBandRequest(r: { uid: string; email: string; displayName: string; bandName: string; bandId: string; domain: string }) {
+export function fileBandRequest(r: { uid: string; email: string; displayName: string; bandName: string; bandId: string }) {
   return setDoc(requestDoc(r.uid), {
     uid: r.uid,
     email: r.email,
     displayName: r.displayName,
     bandName: r.bandName.trim(),
     bandId: r.bandId,
-    ...(r.domain.trim() ? { domain: r.domain.trim().toLowerCase().replace(/^https?:\/\//, "").replace(/\/.*$/, "") } : {}),
+    plan: "free", // Paid can't be requested until online payment exists (firestore.rules insists on this too)
     termsVersion: TERMS_VERSION,
     termsAcceptedAt: serverTimestamp(), // the rules require the server's own clock here
     status: "pending",
@@ -73,7 +73,8 @@ export async function approveBandRequest(r: BandRequest) {
       const existing = await tx.get(domainRef);
       if (existing.exists() && existing.data().bandId !== r.bandId) throw new Error(tr("con.errDomain", { d: r.domain }));
     }
-    tx.set(bandRef, { name: r.bandName, status: "active", createdAt: Date.now() });
+    tx.set(bandRef, { name: r.bandName, status: "active", createdAt: Date.now(), plan: r.plan === "paid" ? "paid" : "free", extraPacks: 0 });
+    tx.set(doc(db, "bands", r.bandId, "settings", "usage"), { items: 0, bytes: 0, members: 1 });
     tx.set(doc(db, "bands", r.bandId, "settings", "public"), { ...DEFAULT_SETTINGS, bandName: r.bandName });
     tx.set(doc(db, "bands", r.bandId, "settings", "band"), { gig: "" });
     tx.set(doc(db, "bands", r.bandId, "members", r.uid), { email: r.email, displayName: r.displayName, role: "admin", createdAt: Date.now() });
@@ -83,6 +84,10 @@ export async function approveBandRequest(r: BandRequest) {
 }
 
 export const rejectBandRequest = (uid: string) => updateDoc(requestDoc(uid), { status: "rejected", rejectedAt: Date.now() });
+
+/** Switch a band between Free and Paid and set how many extra-space packs it has (operator only). */
+export const setBandPlan = (bandId: string, plan: "free" | "paid", extraPacks: number) =>
+  updateDoc(doc(db, "bands", bandId), { plan, extraPacks: Math.max(0, Math.floor(extraPacks)) });
 
 export const setBandStatus = (bandId: string, status: "active" | "paused") => updateDoc(doc(db, "bands", bandId), { status });
 
@@ -109,8 +114,8 @@ async function deleteStorageFolder(path: string) {
  *  The band record goes last, so an interrupted run can simply be started again. */
 export async function deleteBand(bandId: string) {
   await setBandStatus(bandId, "paused"); // closes the store for fans while it is being emptied
-  for (const sub of ["sales", "items", "stock", "bundles", "members"]) await deleteAllIn(collection(db, "bands", bandId, sub));
-  for (const id of ["public", "band"]) await deleteDoc(doc(db, "bands", bandId, "settings", id));
+  for (const sub of ["sales", "items", "stock", "bundles", "members", "invites"]) await deleteAllIn(collection(db, "bands", bandId, sub));
+  for (const id of ["public", "band", "usage"]) await deleteDoc(doc(db, "bands", bandId, "settings", id));
   await deleteStorageFolder(`bands/${bandId}`);
   for (const col of [domainsCol(), requestsCol()]) {
     const snap = await getDocs(query(col, where("bandId", "==", bandId)));

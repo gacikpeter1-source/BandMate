@@ -5,6 +5,9 @@ import { setDoc } from "firebase/firestore";
 import { auth } from "../../firebase";
 import { bandDoc } from "../../lib/scope";
 import { useSettings } from "../../state/settings";
+import { useBand } from "../../state/band";
+import { useTenant } from "../../state/tenant";
+import { ExtendButton, UsageCard } from "../../components/plans";
 import { roleLabel, useAuth } from "../../state/auth";
 import { useToast } from "../../state/toast";
 import { errorText } from "../../lib/format";
@@ -22,12 +25,19 @@ const CURRENCIES = ["€", "Kč", "zł", "Ft", "£", "$", "kr", "CHF"];
 export default function SettingsPage() {
   return (
     <div className="flow">
+      <PlanSection />
       <BandSection />
       <LookSection />
       <TopBarSection />
       <AccountSection />
     </div>
   );
+}
+
+function PlanSection() {
+  const { limits, usage } = useBand();
+  const { band } = useTenant();
+  return <UsageCard limits={limits} usage={usage} packs={band?.extraPacks || 0} />;
 }
 
 function save(data: Partial<PublicSettings>, toast: (m: string) => void, msg: string) {
@@ -75,6 +85,7 @@ function BandSection() {
 
 function LookSection() {
   const t = useT();
+  const { limits } = useBand();
   const { settings, previewTheme } = useSettings();
   const toast = useToast();
   const [preset, setPreset] = useState(settings.preset);
@@ -98,6 +109,13 @@ function LookSection() {
   return (
     <section className="card">
       <h2 className="card-h">{t("set.look")}</h2>
+      {!limits.design && (
+        <div className="stack-sm">
+          <p className="hint">{t("set.designLocked")}</p>
+          <ExtendButton />
+        </div>
+      )}
+      <div className={`stack ${limits.design ? "" : "plan-locked"}`} {...(limits.design ? {} : ({ inert: "" } as object))}>
       <div className="field">
         <span className="label">{t("set.startStyle")}</span>
         <div className="presets">
@@ -174,6 +192,7 @@ function LookSection() {
           <Toggle id="sInHeader" checked={inHeader} onChange={(v) => { setInHeader(v); save({ logoInHeader: v }, toast, t("set.saved")); }} label={t("set.showLogoHeader")} />
         </>
       )}
+      </div>
     </section>
   );
 }

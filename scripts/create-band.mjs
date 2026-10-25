@@ -11,12 +11,13 @@
 //   --password only for a brand-new login; otherwise a random one is set and the person uses
 //              "Forgot password?" on the band's login page.
 //   --sample   also adds the example stock list (hat, T-shirts, cup) and a bundle.
+//   --plan     free (default) or paid; see src/lib/plans.ts for what each includes.
 import { DEFAULT_PUBLIC_SETTINGS, SAMPLE_ITEMS, ensureUser, init, list, parseArgs, validBandId } from "./lib.mjs";
 
 const { pos, flags } = parseArgs(process.argv.slice(2));
 const [bandId, name, email] = pos;
 if (!bandId || !name || !email) {
-  console.error('Usage: node scripts/create-band.mjs <bandId> "<Band name>" <adminEmail> [--domain host]... [--password pw] [--sample]');
+  console.error('Usage: node scripts/create-band.mjs <bandId> "<Band name>" <adminEmail> [--domain host]... [--password pw] [--sample] [--plan free|paid]');
   process.exit(1);
 }
 if (!validBandId(bandId)) {
@@ -45,7 +46,9 @@ for (const d of domains) {
 
 const { user, created, randomPassword } = await ensureUser(auth, email.toLowerCase(), typeof flags.password === "string" ? flags.password : undefined, "Admin");
 const batch = db.batch();
-batch.set(bandRef, { name, status: "active", createdAt: Date.now() });
+const plan = flags.plan === "paid" ? "paid" : "free";
+batch.set(bandRef, { name, status: "active", createdAt: Date.now(), plan, extraPacks: 0 });
+batch.set(db.doc(`bands/${bandId}/settings/usage`), { items: flags.sample ? SAMPLE_ITEMS.length : 0, bytes: 0, members: 1 });
 batch.set(db.doc(`bands/${bandId}/settings/public`), DEFAULT_PUBLIC_SETTINGS(name));
 batch.set(db.doc(`bands/${bandId}/settings/band`), { gig: "" });
 batch.set(db.doc(`bands/${bandId}/members/${user.uid}`), { email: email.toLowerCase(), displayName: user.displayName || "Admin", role: "admin", createdAt: Date.now() });

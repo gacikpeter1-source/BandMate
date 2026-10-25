@@ -1,6 +1,8 @@
 import { useEffect, useRef, useState, type ReactNode } from "react";
-import { uploadImage } from "../lib/images";
+import { removeImage, uploadImage } from "../lib/images";
 import { errorText } from "../lib/format";
+import { LimitError } from "../lib/planState";
+import { LimitNote } from "./plans";
 import { useT } from "../i18n";
 import type { Photo } from "../types";
 
@@ -96,6 +98,7 @@ export function ImageField({
   const t = useT();
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState("");
+  const [limit, setLimit] = useState(false);
   const input = useRef<HTMLInputElement>(null);
   return (
     <div className="field">
@@ -121,6 +124,7 @@ export function ImageField({
                   onChange(await uploadImage(f, folder));
                 } catch (x) {
                   setErr(errorText(x));
+                  setLimit(x instanceof LimitError);
                 } finally {
                   setBusy(false);
                   if (input.current) input.current.value = "";
@@ -135,7 +139,7 @@ export function ImageField({
           )}
         </div>
       </div>
-      {err ? <span className="hint err">{err}</span> : hint && <span className="hint">{hint}</span>}
+      {err ? limit ? <LimitNote text={err} /> : <span className="hint err">{err}</span> : hint && <span className="hint">{hint}</span>}
     </div>
   );
 }
@@ -195,8 +199,12 @@ export function PhotosField({
   const t = useT();
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState("");
+  const [limit, setLimit] = useState(false);
   const input = useRef<HTMLInputElement>(null);
   const room = max - photos.length;
+  // Pictures uploaded in this editing session and removed again before saving would otherwise stay in
+  // Storage, counting against the band's space for nothing.
+  const fresh = useRef(new Set<string>());
 
   const add = async (files: File[]) => {
     setBusy(true);
@@ -207,7 +215,9 @@ export function PhotosField({
       if (files.length > room) setErr(t("photos.limit", { max, n: Math.max(0, room) }));
     } catch (x) {
       setErr(errorText(x));
+      setLimit(x instanceof LimitError);
     } finally {
+      added.forEach((a) => fresh.current.add(a.path));
       if (added.length) onChange([...photos, ...added]);
       setBusy(false);
       if (input.current) input.current.value = "";
@@ -221,7 +231,10 @@ export function PhotosField({
         {photos.map((p, i) => (
           <div className="ph" key={p.url}>
             <img src={p.url} alt="" />
-            <button type="button" className="ph-x" onClick={() => onChange(photos.filter((_, j) => j !== i))} aria-label={t("photos.removeAria", { n: i + 1 })}>
+            <button type="button" className="ph-x" onClick={() => {
+              if (fresh.current.delete(p.path)) removeImage(p.path);
+              onChange(photos.filter((_, j) => j !== i));
+            }} aria-label={t("photos.removeAria", { n: i + 1 })}>
               {Icon.x}
             </button>
             {i === 0 ? (
@@ -250,7 +263,7 @@ export function PhotosField({
           </label>
         )}
       </div>
-      {err ? <span className="hint err">{err}</span> : hint && <span className="hint">{hint}</span>}
+      {err ? limit ? <LimitNote text={err} /> : <span className="hint err">{err}</span> : hint && <span className="hint">{hint}</span>}
     </div>
   );
 }

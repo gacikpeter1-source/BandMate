@@ -7,6 +7,7 @@
 import { doc, increment, writeBatch, setDoc, updateDoc } from "firebase/firestore";
 import { db } from "../firebase";
 import { bandCol, bandDoc, bandPath } from "./scope";
+import { assertItemRoom } from "./planState";
 import type { Item, Method, Photo, Sale, SaleLine } from "../types";
 
 type StockMap = Record<string, number>;
@@ -89,14 +90,20 @@ export function createItems(
   qty: number,
   orderStart: number
 ) {
+  const list = variants.length ? variants : [""];
+  assertItemRoom(list.length); // the plan's item limit; the same limit is enforced by firestore.rules
   const b = writeBatch(db);
-  (variants.length ? variants : [""]).forEach((variant, i) => {
+  list.forEach((variant, i) => {
     const ref = doc(bandCol("items"));
     b.set(ref, { ...base, variant, soldOut: qty <= 0, order: orderStart + i });
     b.set(bandDoc("stock", ref.id), { qty });
   });
+  b.set(usageDoc(), { items: increment(list.length) }, { merge: true });
   return b.commit();
 }
+
+/** The running totals the plan limits are checked against (see lib/plans.ts and firestore.rules). */
+export const usageDoc = () => bandPath("settings/usage");
 
 export const updateItem = (id: string, data: Partial<Omit<Item, "id">>) => updateDoc(bandDoc("items", id), data);
 
@@ -104,6 +111,7 @@ export function deleteItem(id: string) {
   const b = writeBatch(db);
   b.delete(bandDoc("items", id));
   b.delete(bandDoc("stock", id));
+  b.set(usageDoc(), { items: increment(-1) }, { merge: true });
   return b.commit();
 }
 

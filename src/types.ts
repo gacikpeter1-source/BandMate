@@ -127,8 +127,19 @@ export interface BandRequest {
   bandId: string;
   /** Optional domain the band already owns. */
   domain?: string;
+  /** The plan chosen at sign-up. Only "free" can be requested until online payment exists. */
+  plan?: "free" | "paid";
   termsVersion: string;
   termsAcceptedAt: unknown;
   status: "pending" | "approved" | "rejected";
+  createdAt: number;
+}
+
+/** A person invited into a band by email (paid plans). Doc id = the lowercase email address. */
+export interface Invite {
+  id: string;
+  email: string;
+  role: "bandmate";
+  invitedBy: string;
   createdAt: number;
 }

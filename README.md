@@ -22,7 +22,7 @@ Every band has its own space under its own short ID (for example `saw-dust-and-m
 | Fan | Anyone, not signed in | See visible products, prices, QR codes, top bar |
 | Pending | Signed up, not approved yet | Sees a "waiting for approval" screen only |
 | BandMate | Approved by the admin | Everything on the band desk: stock, adding pieces, QR uploads, bundles, sales, undo, colours, logo, top bar |
-| Admin | The band's first admin is created with `create-band` (below) | Everything a BandMate can do, plus approving people, changing roles and deleting sales |
+| Admin | The band's first admin is created with `create-band` (below) | Everything a BandMate can do, plus inviting and removing people, changing roles and deleting sales |
 | Disabled | Blocked by the admin | Nothing |
 
 These rules are enforced on Google's servers by `firestore.rules` and `storage.rules`, not only by hiding buttons. A fan who opens the browser console still can't read stock or sales.
@@ -104,9 +104,19 @@ From then on, every push to `main` redeploys automatically.
 
 ## How band members join
 
-1. They open the band's `/register` page (`/b/<bandId>/register` on BandMate's address), enter a name, email and password, and land on a "Waiting for approval" screen.
-2. The admin opens **People**, which shows a red badge when someone is waiting, and taps **Approve as BandMate**.
-3. Their screen switches to the band desk by itself.
+Nobody joins on their own. On a **Paid** band the admin invites each person by email:
+
+1. The admin opens **People**, types the person's email and taps **Send invitation** (a Paid band has room for 3 people).
+2. The person gets an email with a link. The link confirms the address; they choose a name and a password.
+3. They land in the band desk. The admin can remove anyone from **People** at any time, in one tap.
+
+A **Free** band is just for one person (the one who registered), so there is nobody to invite.
+
+## Plans
+
+Free: 1 person, 100 items, 50 MB of pictures. Paid (2 € a month): 3 people, 200 items, 150 MB, your own colours and design, your own domain. Extra picture space: +150 MB for 2 € a month, as often as needed. The numbers are in `src/lib/plans.ts`, `firestore.rules` and `storage.rules`. Online payment is not connected yet, so the BandMate operator switches a band to Paid in the console (`/platform`) or with `node scripts/set-plan.mjs <bandId> paid`. For a band created before plans existed, run `node scripts/recount-usage.mjs <bandId> --bucket <your-storage-bucket>` once.
+
+To let people be invited, turn on **Authentication → Sign-in method → Email/Password → Email link (passwordless sign-in)** in Firebase.
 
 ## Testing the security rules
 
@@ -116,7 +126,7 @@ You need Java 11 or newer installed. The emulators run on your computer:
 npm run test:rules
 ```
 
-The tests check that fans can't see stock, sales or hidden items, that sign-ups can only create pending accounts, that BandMates can't approve people, that the admin can't lock themselves out, and that only band staff can upload images.
+The tests check that fans can't see stock, sales or hidden items, that nobody can join without an invitation to their own verified email, that plan limits (items, picture space, people) and the Paid-only design settings are enforced, that BandMates can't approve people, that the admin can't lock themselves out, and that only band staff can upload images.
 
 ## Notes
 

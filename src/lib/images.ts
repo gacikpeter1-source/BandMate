@@ -1,7 +1,10 @@
-import { ref, uploadBytes, getDownloadURL, deleteObject } from "firebase/storage";
-import { storage } from "../firebase";
+import { ref, uploadBytes, getDownloadURL, deleteObject, getMetadata } from "firebase/storage";
+import { increment, setDoc } from "firebase/firestore";
+import { db, storage } from "../firebase";
+import { doc } from "firebase/firestore";
 import { getBandId } from "./scope";
 import { tr } from "../i18n";
+import { assertSpaceRoom } from "./planState";
 
 async function resize(file: File, max: number, type: "image/png" | "image/webp"): Promise<Blob> {
   let bmp: ImageBitmap;
@@ -30,14 +33,28 @@ export async function uploadImage(file: File, folder: "qr" | "logo" | "photos") 
   const max = folder === "qr" ? 1000 : folder === "photos" ? 1400 : 1600;
   const blob = await resize(file, max, folder === "qr" ? "image/png" : "image/webp");
   if (blob.size > 5 * 1024 * 1024) throw new Error(tr("img.stillBig"));
+  assertSpaceRoom(blob.size); // the plan's picture space; storage.rules enforces the same limit
   const type = blob.type || file.type;
   const ext = type.split("/")[1]?.replace("jpeg", "jpg") || "img";
   const path = `bands/${getBandId()}/${folder}/${Date.now()}-${Math.random().toString(36).slice(2, 8)}.${ext}`;
   const r = ref(storage, path);
   await uploadBytes(r, blob, { contentType: type, cacheControl: "public,max-age=31536000,immutable" });
+  await addBytes(blob.size);
   return { url: await getDownloadURL(r), path };
 }
 
-export function removeImage(path?: string | null) {
-  if (path) deleteObject(ref(storage, path)).catch(() => {});
+/** Keeps the band's "space used" total (settings/usage) in step with what is in Storage. */
+function addBytes(delta: number) {
+  return setDoc(doc(db, "bands", getBandId(), "settings", "usage"), { bytes: increment(delta) }, { merge: true }).catch(() => {});
+}
+
+export async function removeImage(path?: string | null) {
+  if (!path) return;
+  try {
+    const size = (await getMetadata(ref(storage, path))).size;
+    await deleteObject(ref(storage, path));
+    await addBytes(-size);
+  } catch {
+    /* already gone, or offline: nothing more to do */
+  }
 }

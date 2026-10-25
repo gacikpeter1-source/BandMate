@@ -1,6 +1,6 @@
 import { createContext, useContext, useEffect, useState, type ReactNode } from "react";
 import { onAuthStateChanged, type User } from "firebase/auth";
-import { doc, getDoc, onSnapshot, setDoc } from "firebase/firestore";
+import { doc, getDoc, getDocFromServer, onSnapshot, writeBatch } from "firebase/firestore";
 import { auth, db } from "../firebase";
 import type { Role, UserProfile } from "../types";
 import { tr } from "../i18n";
@@ -21,8 +21,8 @@ interface AuthCtx extends AuthState {
 
 const Ctx = createContext<AuthCtx>({ user: null, profile: null, isPlatform: false, ready: false, recheck: async () => {} });
 
-// The register page sets the chosen name here before the account exists, so the
-// profile document is created once, by the listener below, with the right name.
+// The invitation page sets the chosen name here, so the membership document is created once,
+// by the listener below, with the right name.
 let pendingName: string | null = null;
 export const setPendingName = (n: string) => {
   pendingName = n;
@@ -71,25 +71,44 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           return;
         }
         const ref = doc(db, "bands", bandId, "members", u.uid);
+        let seq = 0;
         stopDoc = onSnapshot(
           ref,
           (snap) => {
+            const mine = ++seq;
             const email = (u.email || "").toLowerCase();
             const member = snap.exists() ? ({ ...(snap.data() as Omit<UserProfile, "id">), id: snap.id } as UserProfile) : null;
-            if (!member && !platform) {
-              setDoc(ref, {
-                email,
-                displayName: pendingName || u.displayName || email.split("@")[0],
-                role: "pending",
-                createdAt: Date.now(),
-              }).catch(() => set({ user: u, profile: null, isPlatform: platform, ready: true }));
-              pendingName = null;
-              return;
-            }
-            const profile: UserProfile | null = platform
-              ? { id: u.uid, email, displayName: member?.displayName || u.displayName || email.split("@")[0], role: "admin" }
-              : member;
-            set({ user: u, profile, isPlatform: platform, ready: true });
+            const apply = (m: UserProfile | null) => {
+              if (mine !== seq || cancelled) return; // a newer snapshot already decided
+              if (!m && !platform) {
+                // Nobody joins on their own. If an admin invited this (verified) address, accepting means
+                // creating the membership and using up the invitation, in one step.
+                const inviteRef = doc(db, "bands", bandId, "invites", email);
+                getDoc(inviteRef)
+                  .then((inv) => {
+                    if (!inv.exists()) return set({ user: u, profile: null, isPlatform: platform, ready: true });
+                    const b = writeBatch(db);
+                    b.set(ref, { email, displayName: pendingName || u.displayName || email.split("@")[0], role: inv.data().role || "bandmate", createdAt: Date.now() });
+                    b.delete(inviteRef);
+                    pendingName = null;
+                    return b.commit(); // the snapshot listener fires again with the new membership
+                  })
+                  .catch(() => set({ user: u, profile: null, isPlatform: platform, ready: true }));
+                return;
+              }
+              const profile: UserProfile | null = platform
+                ? { id: u.uid, email, displayName: m?.displayName || u.displayName || email.split("@")[0], role: "admin" }
+                : m;
+              set({ user: u, profile, isPlatform: platform, ready: true });
+            };
+            if (member && snap.metadata.fromCache && !platform) {
+              // A membership remembered on this phone may have been removed since. Ask the server before
+              // opening the desk, so a removed person never starts reading data they no longer may read.
+              // Offline (or a very slow signal) the remembered membership is trusted, so the desk still works.
+              Promise.race([getDocFromServer(ref).then((x) => x.exists()), new Promise<boolean>((r) => setTimeout(() => r(true), 3000))])
+                .catch(() => true)
+                .then((stillThere) => apply(stillThere ? member : null));
+            } else apply(member);
           },
           () => set({ user: u, profile: null, isPlatform: platform, ready: true })
         );

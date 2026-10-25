@@ -13,7 +13,8 @@ import { ToastProvider } from "./state/toast";
 import TenantGate from "./components/TenantGate";
 import { Loading } from "./components/ui";
 import PublicPage from "./pages/PublicPage";
-import { Login, Register } from "./pages/AuthPages";
+import { Login } from "./pages/AuthPages";
+import Accept from "./pages/band/Accept";
 import BandApp from "./pages/band/BandApp";
 import PlatformHome from "./pages/platform/PlatformHome";
 import PlatformConsole from "./pages/platform/PlatformConsole";
@@ -91,7 +92,7 @@ function BandRoutes() {
     <Routes>
       <Route path="/" element={<PublicPage />} />
       <Route path="/login" element={<Login />} />
-      <Route path="/register" element={<Register />} />
+      <Route path="/accept" element={<Accept />} />
       <Route path="/band/*" element={<BandApp />} />
       <Route path="*" element={<Navigate to="/" replace />} />
     </Routes>
@@ -108,7 +109,7 @@ function PlatformApp() {
               <Route path="/" element={<PlatformHome />} />
               <Route path="/start" element={<StartPage />} />
               <Route path="/start/login" element={<Login variant="customer" />} />
-              <Route path="/start/register" element={<Register variant="customer" />} />
+              <Route path="/start/register" element={<Navigate to="/start" replace />} />
               <Route path="/terms" element={<TermsPage />} />
               <Route path="/platform/login" element={<Login variant="operator" />} />
               <Route path="/platform" element={<PlatformConsole />} />

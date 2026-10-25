@@ -1,5 +1,6 @@
 import { useState, type FormEvent } from "react";
 import { useBand } from "../../state/band";
+import { LimitNote } from "../../components/plans";
 import { useSettings } from "../../state/settings";
 import { useAuth } from "../../state/auth";
 import { useToast } from "../../state/toast";
@@ -14,9 +15,10 @@ const pill = (n: number) => (n < 0 ? "out" : n === 0 ? "out" : n <= 3 ? "low" : 
 
 export default function Stock() {
   const t = useT();
-  const { items, stock, band } = useBand();
+  const { items, stock, band, limits, usage } = useBand();
   const { settings } = useSettings();
   const { profile } = useAuth();
+  const atLimit = usage.items >= limits.items;
   const toast = useToast();
   const cur = settings.currency;
   const [edit, setEdit] = useState<Item | "new" | null>(null);
@@ -41,8 +43,9 @@ export default function Stock() {
   return (
     <>
       <div className="toolbar">
-        <button className="btn primary" onClick={() => setEdit("new")}>{t("stock.add")}</button>
+        <button className="btn primary" disabled={atLimit} onClick={() => setEdit("new")}>{t("stock.add")}</button>
       </div>
+      {atLimit && <LimitNote text={t("limit.items", { max: limits.items })} />}
       {groups.length > 0 && <p className="note num">{t("stock.items", { n: items.length })} · {t("stock.piecesInStock", { n: totalPcs })}</p>}
       {!groups.length && (
         <div className="empty">
@@ -194,7 +197,11 @@ function ItemSheet({ item, onClose }: { item: Item | null; onClose: () => void }
     } else {
       const variants = variant.split(",").map((v) => v.trim()).filter(Boolean);
       const order = Math.max(0, ...items.map((i) => i.order ?? 0)) + 1;
-      done(createItems({ name: name.trim(), price: p, qrUrl: qr?.url ?? null, qrPath: qr?.path ?? null, visible, images: shownPhotos }, variants, q, order));
+      try {
+        done(createItems({ name: name.trim(), price: p, qrUrl: qr?.url ?? null, qrPath: qr?.path ?? null, visible, images: shownPhotos }, variants, q, order));
+      } catch (limit) {
+        return toast(errorText(limit)); // over the plan's item limit: keep the form open so nothing typed is lost
+      }
       toast(variants.length > 1 ? t("item.addedSizes", { n: variants.length, name: name.trim() }) : t("item.added", { name: name.trim() }));
     }
     onClose();

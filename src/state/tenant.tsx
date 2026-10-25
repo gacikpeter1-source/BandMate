@@ -8,6 +8,9 @@ export interface BandInfo {
   name: string;
   status: "active" | "paused";
   createdAt?: number;
+  /** "free" when missing. Only the BandMate operator can change plan and extraPacks (see lib/plans.ts). */
+  plan?: "free" | "paid";
+  extraPacks?: number;
 }
 
 interface TenantState {
